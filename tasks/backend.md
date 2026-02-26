@@ -54,3 +54,44 @@
 4. Implement `_add_css_styling(html) -> str` — inject del=red, ins=green CSS.
 5. Write `diff_generator.md` spec doc.
 **Result file**: `tasks/results/diff-generator-agent.md`
+
+---
+
+## Task: Implement Azure Function HTTP Trigger
+**File**: `src/functions/format_exam/__init__.py`
+**Goal**: HTTP-triggered Azure Function that accepts a `.docx` upload, invokes `CoordinatorAgent`, and returns the job result JSON.
+**Steps**:
+1. Accept `multipart/form-data` POST with `file` (binary) and `user_id` (string) fields.
+2. Upload received bytes to `examops-input` via `FileHandlerAgent.upload_to_blob`.
+3. Generate `job_id` (UUID4) and call `CoordinatorAgent.process_job(job_id, user_id, blob_url)`.
+4. Return 200 JSON `{job_id, status, compliance_score, formatted_url, diff_url, onedrive_link, summary}` on success.
+5. Return 400 for missing fields, 422 for corrupted file, 500 for unexpected errors.
+6. Write `function.json` with `httpTrigger` binding, `POST` only, `authLevel: function`.
+**Result file**: `tasks/results/azure-function.md`
+
+---
+
+## Task: Implement Teams Bot
+**File**: `src/bot/bot.py`, `src/bot/app.py`
+**Goal**: Microsoft Teams bot that accepts a `.docx` attachment, triggers the pipeline, and replies with a formatted adaptive card showing results.
+**Steps**:
+1. In `bot.py` implement `ExamOpsBot(ActivityHandler)` with `on_message_activity`.
+2. Detect `.docx` attachment, download it via `attachment.content_url`, upload via `FileHandlerAgent.upload_to_blob`.
+3. Reply with "Processing…" card, then call `CoordinatorAgent.process_job`.
+4. On completion send adaptive card with: compliance score badge, fix counts (numbering/spacing/formatting), OneDrive link button, diff report link button.
+5. Handle no-attachment case: reply with usage instructions.
+6. In `app.py` configure `BotFrameworkAdapter` with `MicrosoftAppId`/`MicrosoftAppPassword` from env, wire `/api/messages` route.
+**Result file**: `tasks/results/teams-bot.md`
+
+---
+
+## Task: Implement Tests
+**File**: `tests/test_formatting_engine.py`, `tests/test_diff_generator.py`, `tests/test_coordinator_agent.py`
+**Goal**: Unit tests covering the core formatting transforms, diff generation, and coordinator error paths.
+**Steps**:
+1. `test_formatting_engine.py` — test `_fix_numbering` (Q1.→(a)→(i)), `_fix_marks_notation`, `_fix_colon_spacing`, `m:oMath` guard skips math runs.
+2. `test_diff_generator.py` — test `generate_summary_stats` counts, `_add_css_styling` injects correct CSS, `create_html_diff` returns `html` and `stats` keys.
+3. `test_coordinator_agent.py` — test `process_job` success path (mock agents), `ERR_CORRUPTED_FILE`, `ERR_TEMPLATE_NOT_FOUND`, LLM timeout fallback → `status="partial"`.
+4. All tests use `pytest` + `pytest-asyncio`; mock Azure SDK calls with `unittest.mock`.
+5. Add `tests/__init__.py` and `tests/conftest.py` with shared fixtures (sample docx, mock template_rules).
+**Result file**: `tasks/results/tests.md`
