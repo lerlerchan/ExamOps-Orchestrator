@@ -132,24 +132,21 @@ If a result file is missing, the subtask is not done — do not proceed past it.
 
 ---
 
-## Key Architectural Decisions
+## Agents
 
-### Hybrid Formatting Engine (Two Layers)
+### CoordinatorAgent (`src/agents/coordinator_agent.py`)
+Orchestrates the full workflow and owns job state. Single entry point from both the Teams Bot and the Azure Function HTTP trigger. Calls agents in sequence: `FileHandlerAgent` → `FormattingEngineAgent` → `DiffGeneratorAgent`. Agents do not call each other directly — all routing goes through here.
 
-`formatting_engine.py` uses two layers deliberately — do not merge them:
+### FileHandlerAgent (`src/agents/file_handler_agent.py`)
+Azure Blob Storage CRUD for the three containers (`examops-input`, `examops-output`, `examops-templates`) and OneDrive sharing links via Microsoft Graph API. Also retrieves template rules from Azure AI Search for the formatting step.
 
-1. **Rule-Based Layer** (`RuleBasedFormatter`): Deterministic python-docx transforms — header/footer injection, numbering correction, marks formatting `(3 marks)`, spacing (`DATE :` → `DATE : `), indentation (`Tab 0.5 × 3 = 1.5cm` for level 2, `× 6 = 3.0cm` for level 3).
+### FormattingEngineAgent (`src/agents/formatting_engine.py`)
+Two-layer hybrid — do not merge the layers:
 
-2. **LLM Validation Layer** (`LLMValidator`): GPT-4o-mini via Azure Foundry handles ambiguous numbering, preserves math expressions, and returns a compliance score (0–100%). Only called after rule-based layer completes.
+- **Layer 1 — Rule-Based** (`RuleBasedFormatter`): Deterministic python-docx transforms: header/footer injection, numbering correction (`Q1.` → `(a)` → `(i)`), marks notation `(3 marks)`, colon spacing (`DATE :` → `DATE : `), indentation (`Tab 0.5 × 3 = 1.5cm` level 2, `× 6 = 3.0cm` level 3).
+- **Layer 2 — LLM Validation** (`LLMValidator`): GPT-4o-mini via Azure Foundry — runs after Layer 1, handles ambiguous numbering edge cases, preserves `m:oMath` XML runs (never reformat equation content), returns a compliance score 0–100%.
 
-### Template Rules from Vector DB
+Template rules are fetched from Azure AI Search at runtime, not hardcoded. Upload scripts live in `scripts/upload_template.py`.
 
-Template rules are retrieved from Azure AI Search at runtime, not hardcoded. The canonical template schema (margins, fonts, numbering format, marks format, etc.) is in `claude.md` under "Sample Template Rules". Upload scripts go in `scripts/upload_template.py`.
-
-### Agent Communication
-
-`coordinator_agent.py` is the single entry point from the Teams Bot and Azure Function. It orchestrates `file_handler_agent` → `formatting_engine` → `diff_generator` sequentially. Agents do not call each other directly.
-
-### Math Expression Preservation
-
-When iterating over paragraph runs in python-docx, skip any run containing `m:oMath` XML elements — do not reformat equation content.
+### DiffGeneratorAgent (`src/agents/diff_generator.py`)
+Produces a color-coded HTML diff (deletions red, additions green) using `difflib.HtmlDiff` and a summary stats dict: `{numbering_fixes, spacing_fixes, formatting_fixes, compliance_score}`. Delivered to the Teams Bot as an inline card.
