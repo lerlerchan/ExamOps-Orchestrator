@@ -14,6 +14,7 @@ import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from docx import Document
+from docx.document import Document as DocxDocument
 from docx.oxml.ns import qn
 from lxml import etree
 
@@ -193,7 +194,7 @@ class TestFormattingEngineAgent:
         with patch.object(agent.llm_validator, "validate", new=AsyncMock(return_value=mock_validation_result)):
             formatted_doc, validation = await agent.process_and_validate(sample_doc, mock_template_rules)
 
-        assert isinstance(formatted_doc, Document)
+        assert isinstance(formatted_doc, DocxDocument)
         assert validation["compliance_score"] == 92.5
         assert validation["fallback_mode"] is False
 
@@ -204,7 +205,7 @@ class TestFormattingEngineAgent:
         with patch.object(agent.llm_validator, "validate", new=AsyncMock(return_value=fallback_validation_result)):
             formatted_doc, validation = await agent.process_and_validate(sample_doc, mock_template_rules)
 
-        assert isinstance(formatted_doc, Document)
+        assert isinstance(formatted_doc, DocxDocument)
         assert validation["fallback_mode"] is True
         assert validation["compliance_score"] is None
 

@@ -10,10 +10,7 @@ from docx import Document
 def _make_doc(*paragraphs: str) -> Document:
     """Create a minimal python-docx Document with the given paragraph texts."""
     doc = Document()
-    # Remove the default blank paragraph
-    for elem in list(doc.paragraphs[0]._element.getparent()):
-        pass  # keep structure intact
-    # Clear default content
+    # Clear any default content (python-docx may or may not add a blank paragraph)
     for para in list(doc.paragraphs):
         para._element.getparent().remove(para._element)
     for text in paragraphs:
