@@ -278,3 +278,183 @@ class TestJobState:
         original_ts = job.updated_at
         job.update_status("formatting")
         assert job.updated_at >= original_ts
+
+
+# ── SK team leader path ───────────────────────────────────────────────────────
+
+
+class TestSKTeamLeaderPath:
+    """Tests for process_job when the SK ChatCompletionAgent is active."""
+
+    @pytest.mark.asyncio
+    async def test_sk_path_returns_success(self):
+        from src.agents.job_context import registry
+
+        job_id = "sk-job-001"
+
+        async def mock_invoke(messages, arguments=None, **kwargs):
+            ctx = registry.get(job_id)
+            ctx.original_doc = _make_mock_doc()
+            ctx.template_rules = MOCK_TEMPLATE_RULES
+            ctx.formatted_doc = _make_mock_doc()
+            ctx.validation_result = MOCK_VALIDATION
+            ctx.diff_result = MOCK_DIFF_RESULT
+            ctx.output_urls = MOCK_OUTPUT_URLS
+            ctx.onedrive_link = "https://onedrive.example.com/link"
+            yield MagicMock()
+
+        coord = CoordinatorAgent.__new__(CoordinatorAgent)
+        coord.file_handler = MagicMock()
+        coord.formatting_engine = MagicMock()
+        coord.diff_generator = MagicMock()
+        coord.team_leader = MagicMock()
+        coord.team_leader.invoke = mock_invoke
+
+        result = await coord.process_job(job_id, "user-sk", "https://blob/input.docx")
+
+        assert result["status"] == "success"
+        assert result["compliance_score"] == 88.0
+        assert result["formatted_url"] == MOCK_OUTPUT_URLS["docx"]
+        assert result["diff_url"] == MOCK_OUTPUT_URLS["html"]
+        assert result["error"] is None
+
+    @pytest.mark.asyncio
+    async def test_sk_path_partial_on_llm_timeout(self):
+        from src.agents.job_context import registry
+
+        job_id = "sk-job-002"
+
+        async def mock_invoke(messages, arguments=None, **kwargs):
+            ctx = registry.get(job_id)
+            ctx.original_doc = _make_mock_doc()
+            ctx.template_rules = MOCK_TEMPLATE_RULES
+            ctx.formatted_doc = _make_mock_doc()
+            ctx.validation_result = MOCK_FALLBACK_VALIDATION
+            ctx.diff_result = MOCK_DIFF_RESULT
+            ctx.output_urls = MOCK_OUTPUT_URLS
+            ctx.onedrive_link = "https://onedrive.example.com/link"
+            yield MagicMock()
+
+        coord = CoordinatorAgent.__new__(CoordinatorAgent)
+        coord.file_handler = MagicMock()
+        coord.formatting_engine = MagicMock()
+        coord.diff_generator = MagicMock()
+        coord.team_leader = MagicMock()
+        coord.team_leader.invoke = mock_invoke
+
+        result = await coord.process_job(job_id, "user-sk", "https://blob/input.docx")
+
+        assert result["status"] == "partial"
+        assert result["compliance_score"] is None
+
+    @pytest.mark.asyncio
+    async def test_sk_path_reads_onedrive_link_from_context(self):
+        from src.agents.job_context import registry
+
+        job_id = "sk-job-003"
+
+        async def mock_invoke(messages, arguments=None, **kwargs):
+            ctx = registry.get(job_id)
+            ctx.original_doc = _make_mock_doc()
+            ctx.template_rules = MOCK_TEMPLATE_RULES
+            ctx.formatted_doc = _make_mock_doc()
+            ctx.validation_result = MOCK_VALIDATION
+            ctx.diff_result = MOCK_DIFF_RESULT
+            ctx.output_urls = MOCK_OUTPUT_URLS
+            ctx.onedrive_link = "https://onedrive.example.com/sk-link"
+            yield MagicMock()
+
+        coord = CoordinatorAgent.__new__(CoordinatorAgent)
+        coord.file_handler = MagicMock()
+        coord.formatting_engine = MagicMock()
+        coord.diff_generator = MagicMock()
+        coord.team_leader = MagicMock()
+        coord.team_leader.invoke = mock_invoke
+
+        result = await coord.process_job(job_id, "user-sk", "https://blob/input.docx")
+
+        assert "onedrive.example.com" in result["onedrive_link"]
+
+    @pytest.mark.asyncio
+    async def test_sk_path_removes_registry_entry_after_success(self):
+        from src.agents.job_context import registry
+
+        job_id = "sk-job-004"
+
+        async def mock_invoke(messages, arguments=None, **kwargs):
+            ctx = registry.get(job_id)
+            ctx.original_doc = _make_mock_doc()
+            ctx.template_rules = MOCK_TEMPLATE_RULES
+            ctx.formatted_doc = _make_mock_doc()
+            ctx.validation_result = MOCK_VALIDATION
+            ctx.diff_result = MOCK_DIFF_RESULT
+            ctx.output_urls = MOCK_OUTPUT_URLS
+            ctx.onedrive_link = "https://onedrive.example.com/link"
+            yield MagicMock()
+
+        coord = CoordinatorAgent.__new__(CoordinatorAgent)
+        coord.file_handler = MagicMock()
+        coord.formatting_engine = MagicMock()
+        coord.diff_generator = MagicMock()
+        coord.team_leader = MagicMock()
+        coord.team_leader.invoke = mock_invoke
+
+        await coord.process_job(job_id, "user-sk", "https://blob/input.docx")
+
+        # Registry entry must be cleaned up after the job completes
+        assert registry.get(job_id) is None
+
+
+# ── SK fallback ───────────────────────────────────────────────────────────────
+
+
+class TestSKFallback:
+    """Tests that process_job falls back to the manual chain when SK fails."""
+
+    @pytest.mark.asyncio
+    async def test_fallback_on_invoke_error_returns_success(self):
+        async def mock_invoke_raises(messages, arguments=None, **kwargs):
+            raise RuntimeError("SK connection error")
+            yield  # makes this an async generator function
+
+        coord = _make_coordinator_with_mocks()
+        coord.team_leader = MagicMock()
+        coord.team_leader.invoke = mock_invoke_raises
+
+        result = await coord.process_job(
+            "sk-fallback-001", "user-abc", "https://blob/input.docx"
+        )
+
+        assert result["status"] == "success"
+        assert result["error"] is None
+
+    @pytest.mark.asyncio
+    async def test_fallback_calls_manual_chain(self):
+        async def mock_invoke_raises(messages, arguments=None, **kwargs):
+            raise RuntimeError("SK unavailable")
+            yield
+
+        coord = _make_coordinator_with_mocks()
+        coord.team_leader = MagicMock()
+        coord.team_leader.invoke = mock_invoke_raises
+
+        result = await coord.process_job(
+            "sk-fallback-002", "user-abc", "https://blob/input.docx"
+        )
+
+        # Manual chain ran — file_handler.download_from_blob was called
+        coord.file_handler.download_from_blob.assert_called_once()
+        assert result["formatted_url"] == MOCK_OUTPUT_URLS["docx"]
+
+    @pytest.mark.asyncio
+    async def test_fallback_without_team_leader_uses_manual_chain(self):
+        """process_job with no team_leader attribute goes straight to manual chain."""
+        coord = _make_coordinator_with_mocks()
+        # team_leader attribute not set — getattr returns None
+
+        result = await coord.process_job(
+            "sk-fallback-003", "user-abc", "https://blob/input.docx"
+        )
+
+        coord.file_handler.download_from_blob.assert_called_once()
+        assert result["status"] == "success"

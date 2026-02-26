@@ -1,19 +1,46 @@
 """
 CoordinatorAgent — single entry point for the ExamOps formatting pipeline.
 
-Orchestrates the full job lifecycle:
-  FileHandlerAgent → FormattingEngineAgent → DiffGeneratorAgent
+Orchestrates the full job lifecycle using a Semantic Kernel "team leader"
+ChatCompletionAgent that delegates each pipeline step to the registered
+plugins via automatic function calling.
 
-All agent calls are routed through here; agents never call each other directly.
+Pipeline order (enforced by team leader system prompt):
+  FileHandlerPlugin.download_document
+  FileHandlerPlugin.get_template
+  FormattingPlugin.format_and_validate
+  DiffPlugin.generate_diff
+  FileHandlerPlugin.save_outputs
+  FileHandlerPlugin.create_sharing_link
+
+On any SK failure the coordinator falls back to the original manual
+sequential chain so the pipeline never silently drops a job.
 """
 
-import os
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# ── Team leader system prompt ────────────────────────────────────────────────
+
+TEAM_LEADER_PROMPT = (
+    "You are the ExamOps Coordinator, team leader of an exam paper formatting pipeline.\n"
+    "Your job is to process a formatting request by calling your tools in this exact order:\n"
+    "  1. download_document    — download the .docx file\n"
+    "  2. get_template         — retrieve institutional formatting rules\n"
+    "  3. format_and_validate  — apply rules and validate compliance\n"
+    "  4. generate_diff        — produce the HTML diff report\n"
+    "  5. save_outputs         — save formatted doc and diff to storage\n"
+    "  6. create_sharing_link  — create a shareable OneDrive link\n"
+    "Call each tool once, in order, passing the job_id. Stop after step 6."
+)
+
+
+# ── JobState (lightweight lifecycle tracker) ─────────────────────────────────
 
 
 @dataclass
@@ -35,6 +62,9 @@ class JobState:
             self.error = error
 
 
+# ── CoordinatorAgent ─────────────────────────────────────────────────────────
+
+
 class CoordinatorAgent:
     """
     Orchestrates the end-to-end exam formatting pipeline.
@@ -43,24 +73,51 @@ class CoordinatorAgent:
       - process_job()  — called by the Azure Function HTTP trigger
       - process_job()  — called by the Teams Bot ActivityHandler
 
-    Sequential call chain:
-      1. FileHandlerAgent.download_from_blob()
-      2. FileHandlerAgent.get_template_from_vectordb()
-      3. FormattingEngineAgent.process_and_validate()
-      4. DiffGeneratorAgent.create_html_diff()
-      5. FileHandlerAgent.save_outputs()
-      6. FileHandlerAgent.create_onedrive_link()
+    Primary path (SK):
+      A ChatCompletionAgent backed by Semantic Kernel calls the pipeline
+      plugins in order via automatic function calling.  Results are
+      exchanged through a JobContextRegistry keyed by job_id.
+
+    Fallback path (manual):
+      If SK initialisation or invocation fails, the coordinator runs
+      the original sequential chain directly.
     """
 
     def __init__(self) -> None:
-        # Lazy imports to avoid circular dependencies at module load time.
-        from src.agents.file_handler_agent.file_handler_agent import FileHandlerAgent
-        from src.agents.formatting_engine.formatting_engine import FormattingEngineAgent
+        # Lazy imports to avoid circular dependencies at module load time
+        from src.agents.file_handler_agent.file_handler_agent import (
+            FileHandlerAgent,
+        )
+        from src.agents.formatting_engine.formatting_engine import (
+            FormattingEngineAgent,
+        )
         from src.agents.diff_generator.diff_generator import DiffGeneratorAgent
 
         self.file_handler = FileHandlerAgent()
         self.formatting_engine = FormattingEngineAgent()
         self.diff_generator = DiffGeneratorAgent()
+
+        # Build the SK team leader — gracefully degrade if unavailable
+        self.team_leader = None
+        try:
+            from semantic_kernel.agents import ChatCompletionAgent
+            from src.agents.kernel_setup import build_kernel
+
+            kernel = build_kernel(
+                self.file_handler, self.formatting_engine, self.diff_generator
+            )
+            self.team_leader = ChatCompletionAgent(
+                kernel=kernel,
+                name="ExamOpsCoordinator",
+                instructions=TEAM_LEADER_PROMPT,
+            )
+            logger.info("Semantic Kernel team leader initialised")
+        except Exception as exc:
+            logger.warning(
+                "SK team leader init failed (%s); will use manual chain", exc
+            )
+
+    # ── Public entry point ───────────────────────────────────────────────────
 
     async def process_job(
         self, job_id: str, user_id: str, file_url: str
@@ -88,6 +145,125 @@ class CoordinatorAgent:
             ERR_TEMPLATE_NOT_FOUND  — Azure AI Search returned no template rules
             ERR_LLM_TIMEOUT         — LLM validation timed out; rule-based only
             ERR_STORAGE             — Azure Blob upload/download failure
+        """
+        if getattr(self, "team_leader", None) is not None:
+            try:
+                return await self._sk_path(job_id, user_id, file_url)
+            except Exception as exc:
+                logger.warning(
+                    "Job %s: SK path failed (%s), falling back to manual chain",
+                    job_id,
+                    exc,
+                )
+                # Clean up any partial registry entry before manual fallback
+                from src.agents.job_context import registry
+                registry.remove(job_id)
+
+        return await self._manual_chain(job_id, user_id, file_url)
+
+    # ── SK path ──────────────────────────────────────────────────────────────
+
+    async def _sk_path(
+        self, job_id: str, user_id: str, file_url: str
+    ) -> dict:
+        """
+        Invoke the SK team leader to run the full pipeline.
+
+        Creates a JobContext in the registry, lets the team leader call
+        plugins in order via automatic function calling, then reads the
+        final state back from the registry.
+
+        Raises:
+            Any exception from team_leader.invoke() or missing registry state.
+        """
+        from semantic_kernel.contents import ChatHistory
+        from semantic_kernel.connectors.ai.function_choice_behavior import (
+            FunctionChoiceBehavior,
+        )
+        from semantic_kernel.connectors.ai.open_ai import (
+            AzureChatPromptExecutionSettings,
+        )
+        from semantic_kernel.kernel_arguments import KernelArguments
+        from src.agents.job_context import registry
+
+        registry.create(job_id, file_url, user_id)
+        logger.info("[SK] Job %s started for user %s", job_id, user_id)
+
+        chat_history = ChatHistory()
+        chat_history.add_user_message(
+            f"Process exam formatting job. job_id={job_id}. "
+            "Start the pipeline now by calling each tool in order."
+        )
+
+        settings = AzureChatPromptExecutionSettings()
+        settings.function_choice_behavior = FunctionChoiceBehavior.Auto()
+        args = KernelArguments(settings=settings)
+
+        async for _ in self.team_leader.invoke(
+            messages=chat_history, arguments=args
+        ):
+            pass  # SK handles all function calling internally
+
+        ctx = registry.get(job_id)
+        if ctx is None:
+            raise RuntimeError(
+                f"Job context missing after SK invocation for job {job_id}"
+            )
+
+        # Surface hard failures (e.g. storage error) as exceptions so the
+        # fallback path can run cleanly
+        if ctx.last_error and not ctx.output_urls:
+            raise RuntimeError(f"SK pipeline failed: {ctx.last_error}")
+
+        # Build result dict from final JobContext state
+        stats = ctx.diff_result.get("summary_stats", {}) if ctx.diff_result else {}
+        compliance_score = (
+            ctx.validation_result.get("compliance_score")
+            if ctx.validation_result
+            else None
+        )
+        llm_timed_out = (
+            ctx.validation_result.get("fallback_mode", False)
+            if ctx.validation_result
+            else False
+        )
+        status = "partial" if llm_timed_out else "success"
+
+        logger.info(
+            "[SK] Job %s completed — status=%s compliance=%s",
+            job_id,
+            status,
+            compliance_score,
+        )
+
+        result = {
+            "status": status,
+            "compliance_score": compliance_score,
+            "formatted_url": ctx.output_urls.get("docx", "") if ctx.output_urls else "",
+            "diff_url": ctx.output_urls.get("html", "") if ctx.output_urls else "",
+            "onedrive_link": ctx.onedrive_link or "",
+            "summary": self._build_summary(stats, compliance_score, llm_timed_out),
+            "error": None,
+        }
+
+        registry.remove(job_id)
+        return result
+
+    # ── Manual fallback chain ────────────────────────────────────────────────
+
+    async def _manual_chain(
+        self, job_id: str, user_id: str, file_url: str
+    ) -> dict:
+        """
+        Original sequential pipeline — runs when SK is unavailable or fails.
+
+        Sequential call chain:
+          1. FileHandlerAgent.download_from_blob()
+          2. FileHandlerAgent.get_template_from_vectordb()
+          3. FormattingEngineAgent.process_and_validate()
+          4. DiffGeneratorAgent.create_html_diff()
+          5. FileHandlerAgent.save_outputs()
+          6. FileHandlerAgent.create_onedrive_link()
         """
         job = JobState(job_id=job_id, user_id=user_id, file_url=file_url)
         logger.info("Job %s started for user %s", job_id, user_id)
@@ -134,7 +310,9 @@ class CoordinatorAgent:
         # Detect LLM timeout fallback
         llm_timed_out = validation_result.get("fallback_mode", False)
         if llm_timed_out:
-            logger.warning("Job %s: LLM timed out, proceeding with rule-based only", job_id)
+            logger.warning(
+                "Job %s: LLM timed out, proceeding with rule-based only", job_id
+            )
 
         # ── Step 4: Generate diff ───────────────────────────────────────────
         job.update_status("generating_diff")
@@ -163,7 +341,9 @@ class CoordinatorAgent:
                 output_urls["docx"]
             )
         except Exception as exc:
-            logger.warning("Job %s: OneDrive link creation failed — %s", job_id, exc)
+            logger.warning(
+                "Job %s: OneDrive link creation failed — %s", job_id, exc
+            )
             onedrive_link = output_urls.get("docx", "")
 
         # ── Build result ────────────────────────────────────────────────────
@@ -189,7 +369,7 @@ class CoordinatorAgent:
             "error": None,
         }
 
-    # ── Helpers ─────────────────────────────────────────────────────────────
+    # ── Helpers ──────────────────────────────────────────────────────────────
 
     def _failure_result(self, job: JobState, error_code: str, detail: str) -> dict:
         return {

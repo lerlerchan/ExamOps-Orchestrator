@@ -95,3 +95,21 @@
 4. All tests use `pytest` + `pytest-asyncio`; mock Azure SDK calls with `unittest.mock`.
 5. Add `tests/__init__.py` and `tests/conftest.py` with shared fixtures (sample docx, mock template_rules).
 **Result file**: `tasks/results/tests.md`
+
+---
+
+## Task: Implement SK "Team Leader" CoordinatorAgent
+**File**: `src/agents/coordinator_agent/coordinator_agent.py`, `src/agents/job_context.py`, `src/agents/kernel_setup.py`, `src/agents/plugins/`
+**Goal**: Replace the hard-coded sequential chain with a `ChatCompletionAgent` team leader that delegates pipeline steps to SK plugins via automatic function calling, with a manual-chain fallback.
+**Steps**:
+1. Create `src/agents/job_context.py` — `JobContext` dataclass + thread-safe `JobContextRegistry` singleton.
+2. Create `src/agents/plugins/__init__.py` (empty package).
+3. Create `src/agents/plugins/file_handler_plugin.py` — `FileHandlerPlugin` with 4 `@kernel_function` methods (`download_document`, `get_template`, `save_outputs`, `create_sharing_link`).
+4. Create `src/agents/plugins/formatting_plugin.py` — `FormattingPlugin` with `format_and_validate` kernel function.
+5. Create `src/agents/plugins/diff_plugin.py` — `DiffPlugin` with `generate_diff` kernel function.
+6. Create `src/agents/kernel_setup.py` — `build_kernel()` wires `AzureChatCompletion` + 3 plugins.
+7. Refactor `CoordinatorAgent.__init__` to instantiate sub-agents, build kernel, and create `ChatCompletionAgent` team leader (graceful degradation if SK unavailable).
+8. Refactor `CoordinatorAgent.process_job` to try SK path first via `_sk_path()`, fall back to original `_manual_chain()` on any exception.
+9. Add `TEAM_LEADER_PROMPT` constant with ordered 6-step pipeline instructions.
+10. Add `TestSKTeamLeaderPath` and `TestSKFallback` test classes to `tests/test_coordinator_agent.py`.
+**Result file**: `tasks/results/team-leader.md`
