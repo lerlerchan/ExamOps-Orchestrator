@@ -23,7 +23,7 @@ Provision the following Azure resources before running locally or deploying:
 
 ```bash
 # 1. Clone and install dependencies
-git clone https://github.com/<org>/examops-orchestrator.git
+git clone https://github.com/lerlerchan/examops-orchestrator.git
 cd examops-orchestrator
 pip install -r requirements.txt
 
