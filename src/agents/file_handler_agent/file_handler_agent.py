@@ -24,15 +24,15 @@ from docx import Document
 logger = logging.getLogger(__name__)
 
 # Azure container names
-CONTAINER_INPUT = "examops-input"
-CONTAINER_OUTPUT = "examops-output"
-CONTAINER_TEMPLATES = "examops-templates"
+CONTAINER_INPUT = os.getenv("BLOB_CONTAINER_INPUT", "examops-input")
+CONTAINER_OUTPUT = os.getenv("BLOB_CONTAINER_OUTPUT", "examops-output")
+CONTAINER_TEMPLATES = os.getenv("BLOB_CONTAINER_TEMPLATES", "examops-templates")
 
 # Azure AI Search index
-SEARCH_INDEX = "exam-templates"
+SEARCH_INDEX = os.getenv("SEARCH_INDEX_NAME", "exam-templates")
 
 # Embedding model
-EMBEDDING_MODEL = "text-embedding-ada-002"
+EMBEDDING_MODEL = os.getenv("AZURE_EMBEDDING_MODEL", "text-embedding-ada-002")
 
 
 class FileHandlerAgent:

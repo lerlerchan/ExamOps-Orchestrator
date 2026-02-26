@@ -316,7 +316,7 @@ class LLMValidator:
         )
 
         response = client.inference.get_chat_completions(
-            model="gpt-4o-mini",
+            model=os.getenv("AZURE_FOUNDRY_DEPLOYMENT", "gpt-4o-mini"),
             messages=[
                 {"role": "system", "content": self.SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
