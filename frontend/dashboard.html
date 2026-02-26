@@ -1,0 +1,1711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExamOps — Orchestrator Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display+SC:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@300;400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080A0F;
+      --surface:  #0E1219;
+      --surface2: #141925;
+      --border:   #1C2333;
+      --border2:  #253048;
+      --gold:     #C9922A;
+      --gold-dim: #8A621C;
+      --gold-glow: rgba(201,146,42,0.18);
+      --gold-pale: rgba(201,146,42,0.07);
+      --text:     #DDE1EC;
+      --text-dim: #6B768F;
+      --text-muted: #3D4659;
+      --green:    #3BC98A;
+      --green-dim: rgba(59,201,138,0.15);
+      --red:      #E05252;
+      --red-dim:  rgba(224,82,82,0.15);
+      --blue:     #4A8EE8;
+      --blue-dim: rgba(74,142,232,0.15);
+      --amber:    #E89A30;
+      --r:        6px;
+      --r-lg:     12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND MESH ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 15% 20%, rgba(201,146,42,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 85% 80%, rgba(74,142,232,0.05) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(201,146,42,0.03) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Noise texture overlay */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
+      pointer-events: none;
+    }
+
+    /* ── LAYOUT ── */
+    .shell {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      grid-template-rows: 60px 1fr;
+      min-height: 100vh;
+    }
+
+    /* ── TOPBAR ── */
+    header {
+      grid-column: 1 / -1;
+      display: flex; align-items: center; gap: 20px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,10,15,0.85);
+      backdrop-filter: blur(12px);
+      position: sticky; top: 0; z-index: 100;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none;
+    }
+
+    .logo-mark {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--gold) 0%, #8A621C 100%);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Playfair Display SC', serif;
+      font-size: 14px; font-weight: 700;
+      color: #000;
+      letter-spacing: -0.5px;
+      box-shadow: 0 0 0 1px rgba(201,146,42,0.4), 0 4px 12px rgba(201,146,42,0.2);
+    }
+
+    .logo-text {
+      font-family: 'Playfair Display SC', serif;
+      font-size: 15px; font-weight: 400;
+      letter-spacing: 0.08em;
+      color: var(--text);
+    }
+
+    .logo-text span { color: var(--gold); }
+
+    .header-sep { flex: 1; }
+
+    .header-meta {
+      display: flex; align-items: center; gap: 20px;
+      font-size: 11px; color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .status-dot {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px;
+    }
+
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .header-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--r);
+      font-size: 12px; color: var(--text-dim);
+      cursor: pointer;
+      transition: all .15s;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .header-btn:hover {
+      border-color: var(--gold-dim);
+      color: var(--text);
+    }
+
+    /* ── SIDEBAR ── */
+    aside {
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      background: rgba(14,18,25,0.6);
+      display: flex; flex-direction: column; gap: 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      padding: 0 12px 8px;
+    }
+
+    .sidebar-label {
+      font-size: 9px; font-weight: 500;
+      letter-spacing: 0.18em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0 8px 8px;
+      margin-top: 8px;
+    }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px;
+      border-radius: var(--r);
+      font-size: 13px; color: var(--text-dim);
+      cursor: pointer;
+      transition: all .15s;
+      margin-bottom: 1px;
+      position: relative;
+    }
+
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+
+    .nav-item.active {
+      background: var(--gold-pale);
+      color: var(--gold);
+      border: 1px solid rgba(201,146,42,0.2);
+    }
+
+    .nav-item.active::before {
+      content: '';
+      position: absolute; left: -12px; top: 50%;
+      transform: translateY(-50%);
+      width: 3px; height: 20px;
+      background: var(--gold);
+      border-radius: 0 2px 2px 0;
+    }
+
+    .nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+    .nav-item.active .nav-icon { opacity: 1; }
+
+    .nav-badge {
+      margin-left: auto;
+      background: var(--gold);
+      color: #000;
+      font-size: 9px; font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .sidebar-divider {
+      height: 1px; background: var(--border);
+      margin: 12px 20px;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .user-chip {
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--gold-dim), #4A2E0A);
+      border: 1px solid var(--gold-dim);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Playfair Display SC', serif;
+      font-size: 11px; color: var(--gold);
+    }
+
+    .user-info { flex: 1; overflow: hidden; }
+    .user-name { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-role { font-size: 10px; color: var(--text-dim); }
+
+    /* ── MAIN CONTENT ── */
+    main {
+      padding: 32px;
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 28px;
+    }
+
+    /* ── PAGE TITLE ── */
+    .page-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+    }
+
+    .page-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px; font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .page-title em {
+      font-style: italic;
+      color: var(--gold);
+    }
+
+    .page-sub {
+      font-size: 13px; color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px;
+      border-radius: var(--r);
+      font-size: 13px; font-weight: 500;
+      cursor: pointer; border: none;
+      transition: all .15s;
+      font-family: 'DM Sans', sans-serif;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--gold);
+      color: #000;
+      box-shadow: 0 0 0 1px rgba(201,146,42,0.5), 0 4px 16px rgba(201,146,42,0.25);
+    }
+
+    .btn-primary:hover {
+      background: #D9A030;
+      box-shadow: 0 0 0 1px rgba(201,146,42,0.7), 0 4px 24px rgba(201,146,42,0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border2);
+      color: var(--text-dim);
+    }
+
+    .btn-ghost:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
+
+    /* ── STAT CARDS ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 20px 24px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+
+    .stat-card:hover { border-color: var(--border2); }
+
+    .stat-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+
+    .stat-card.gold::before { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+    .stat-card.green::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+    .stat-card.blue::before { background: linear-gradient(90deg, transparent, var(--blue), transparent); }
+    .stat-card.red::before { background: linear-gradient(90deg, transparent, var(--red), transparent); }
+
+    .stat-label {
+      font-size: 10px; font-weight: 500;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 12px;
+    }
+
+    .stat-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px; font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .stat-delta {
+      font-size: 11px; color: var(--text-dim);
+      display: flex; align-items: center; gap: 4px;
+    }
+
+    .stat-delta.up { color: var(--green); }
+    .stat-delta.down { color: var(--red); }
+
+    /* ── UPLOAD ZONE ── */
+    .upload-section {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+    }
+
+    .upload-zone {
+      background: var(--surface);
+      border: 2px dashed var(--border2);
+      border-radius: var(--r-lg);
+      padding: 48px 36px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-zone::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 30%, var(--gold-pale), transparent);
+      opacity: 0;
+      transition: opacity .3s;
+    }
+
+    .upload-zone:hover::before,
+    .upload-zone.drag-over::before { opacity: 1; }
+
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: var(--gold-dim);
+      background: var(--surface2);
+    }
+
+    .upload-icon-wrap {
+      width: 64px; height: 64px;
+      margin: 0 auto 20px;
+      background: var(--gold-pale);
+      border: 1px solid rgba(201,146,42,0.2);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+    }
+
+    .upload-zone:hover .upload-icon-wrap {
+      background: var(--gold-glow);
+      border-color: rgba(201,146,42,0.4);
+      transform: scale(1.05);
+    }
+
+    .upload-icon {
+      width: 28px; height: 28px;
+      stroke: var(--gold);
+      fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    .upload-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px; font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .upload-sub {
+      font-size: 13px; color: var(--text-dim);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .upload-constraints {
+      display: flex; align-items: center; justify-content: center; gap: 16px;
+      font-size: 11px; color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .upload-constraints span {
+      display: flex; align-items: center; gap: 5px;
+    }
+
+    #file-input { display: none; }
+
+    /* ── TEMPLATE PICKER ── */
+    .template-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 22px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+
+    .panel-title {
+      font-size: 13px; font-weight: 500;
+      color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .panel-title-icon {
+      width: 16px; height: 16px;
+      stroke: var(--gold); fill: none; stroke-width: 1.5;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    .template-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .template-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .template-item:hover { border-color: var(--border2); }
+    .template-item.selected { border-color: var(--gold-dim); background: var(--gold-pale); }
+
+    .template-radio {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: 1px solid var(--border2);
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+
+    .template-item.selected .template-radio {
+      border-color: var(--gold);
+      background: var(--gold);
+      box-shadow: 0 0 8px rgba(201,146,42,0.4);
+    }
+
+    .template-item.selected .template-radio::after {
+      content: '';
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #000;
+    }
+
+    .template-info { flex: 1; min-width: 0; }
+
+    .template-name {
+      font-size: 12px; font-weight: 500;
+      color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .template-meta {
+      font-size: 10px; color: var(--text-dim);
+      margin-top: 2px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .template-tag {
+      font-size: 9px; font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 10px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: var(--gold-pale);
+      color: var(--gold);
+      border: 1px solid rgba(201,146,42,0.2);
+    }
+
+    /* ── PIPELINE PROGRESS ── */
+    .pipeline-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 26px 28px;
+      display: none;
+    }
+
+    .pipeline-card.visible { display: block; }
+
+    .pipeline-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .pipeline-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px; font-weight: 600;
+      color: var(--text);
+    }
+
+    .pipeline-filename {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--text-dim);
+      margin-top: 3px;
+    }
+
+    .pipeline-pct {
+      font-family: 'Playfair Display SC', serif;
+      font-size: 28px; color: var(--gold);
+    }
+
+    .pipeline-steps {
+      display: flex; gap: 0;
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .pipeline-steps::before {
+      content: '';
+      position: absolute;
+      top: 20px; left: 20px; right: 20px; height: 2px;
+      background: var(--border);
+    }
+
+    .pipeline-bar {
+      position: absolute;
+      top: 20px; left: 20px; height: 2px;
+      background: linear-gradient(90deg, var(--gold), var(--amber));
+      transition: width 0.8s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 0 8px rgba(201,146,42,0.5);
+    }
+
+    .pipeline-step {
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px;
+      position: relative; z-index: 1;
+    }
+
+    .step-node {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      transition: all .4s;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500;
+      color: var(--text-dim);
+    }
+
+    .step-node.done {
+      background: var(--gold);
+      border-color: var(--gold);
+      color: #000;
+      box-shadow: 0 0 16px rgba(201,146,42,0.4);
+    }
+
+    .step-node.active {
+      background: var(--surface);
+      border-color: var(--gold);
+      color: var(--gold);
+      box-shadow: 0 0 0 4px rgba(201,146,42,0.12);
+      animation: step-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes step-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(201,146,42,0.12); }
+      50% { box-shadow: 0 0 0 8px rgba(201,146,42,0.06); }
+    }
+
+    .step-label {
+      font-size: 10px; color: var(--text-dim);
+      text-align: center; white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .step-label.active { color: var(--gold); font-weight: 500; }
+    .step-label.done { color: var(--text); }
+
+    .pipeline-log {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 14px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      height: 90px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+
+    .log-line { display: flex; gap: 10px; }
+    .log-ts { color: var(--text-muted); flex-shrink: 0; }
+    .log-ok { color: var(--green); }
+    .log-run { color: var(--gold); }
+    .log-info { color: var(--blue); }
+
+    /* ── RESULTS SECTION ── */
+    .results-section {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 20px;
+    }
+
+    /* compliance gauge */
+    .compliance-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 26px;
+      display: flex; flex-direction: column; gap: 0;
+    }
+
+    .card-title {
+      font-size: 13px; font-weight: 500; color: var(--text);
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .gauge-wrap {
+      display: flex; justify-content: center; margin-bottom: 20px;
+      position: relative;
+    }
+
+    .gauge-svg { overflow: visible; }
+
+    .gauge-track {
+      fill: none; stroke: var(--border2); stroke-width: 10;
+      stroke-linecap: round;
+    }
+
+    .gauge-fill {
+      fill: none; stroke: var(--gold); stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1);
+      filter: drop-shadow(0 0 6px rgba(201,146,42,0.5));
+    }
+
+    .gauge-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+
+    .gauge-pct {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px; font-weight: 600;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .gauge-label {
+      font-size: 10px; color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 3px;
+    }
+
+    .fix-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+
+    .fix-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 12px 14px;
+    }
+
+    .fix-count {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px; font-weight: 600;
+      color: var(--text);
+    }
+
+    .fix-label {
+      font-size: 10px; color: var(--text-dim);
+      margin-top: 2px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* diff panel */
+    .diff-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 22px;
+      display: flex; flex-direction: column; gap: 14px;
+      overflow: hidden;
+    }
+
+    .diff-body {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.8;
+      flex: 1;
+      overflow-y: auto;
+      max-height: 280px;
+    }
+
+    .diff-line {
+      display: flex; gap: 12px;
+      padding: 0 10px;
+      border-radius: 3px;
+      margin-bottom: 1px;
+    }
+
+    .diff-line-num {
+      color: var(--text-muted);
+      width: 30px;
+      flex-shrink: 0;
+      text-align: right;
+      user-select: none;
+    }
+
+    .diff-line.del {
+      background: var(--red-dim);
+      color: var(--red);
+    }
+
+    .diff-line.add {
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    .diff-line.ctx { color: var(--text-dim); }
+
+    .diff-prefix { flex-shrink: 0; width: 12px; }
+
+    /* ── JOB HISTORY TABLE ── */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-title {
+      font-size: 14px; font-weight: 500; color: var(--text);
+    }
+
+    .search-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 7px 12px;
+      font-size: 12px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      width: 200px;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .search-input:focus { border-color: var(--gold-dim); }
+    .search-input::placeholder { color: var(--text-muted); }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      font-size: 10px; font-weight: 500;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      text-align: left;
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky; top: 0;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .12s;
+      cursor: pointer;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+
+    td {
+      padding: 14px 24px;
+      font-size: 12px; color: var(--text);
+    }
+
+    td.mono {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 10px; font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+    }
+
+    .badge.done { background: var(--green-dim); color: var(--green); }
+    .badge.done .badge-dot { background: var(--green); }
+
+    .badge.running { background: var(--blue-dim); color: var(--blue); }
+    .badge.running .badge-dot { background: var(--blue); animation: pulse-dot 1s infinite; }
+
+    .badge.failed { background: var(--red-dim); color: var(--red); }
+    .badge.failed .badge-dot { background: var(--red); }
+
+    .score-pill {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500;
+      padding: 2px 10px;
+      border-radius: 4px;
+    }
+
+    .score-high { background: var(--green-dim); color: var(--green); }
+    .score-mid { background: rgba(232,154,48,0.15); color: var(--amber); }
+    .score-low { background: var(--red-dim); color: var(--red); }
+
+    .row-actions {
+      display: flex; gap: 6px; opacity: 0;
+      transition: opacity .15s;
+    }
+
+    tbody tr:hover .row-actions { opacity: 1; }
+
+    .icon-btn {
+      width: 26px; height: 26px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all .12s;
+    }
+
+    .icon-btn svg { width: 12px; height: 12px; stroke: var(--text-dim); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .icon-btn:hover { border-color: var(--gold-dim); }
+    .icon-btn:hover svg { stroke: var(--gold); }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-fade { animation: fade-up 0.4s ease both; }
+
+    .stats-row .stat-card:nth-child(1) { animation: fade-up 0.3s ease 0.05s both; }
+    .stats-row .stat-card:nth-child(2) { animation: fade-up 0.3s ease 0.10s both; }
+    .stats-row .stat-card:nth-child(3) { animation: fade-up 0.3s ease 0.15s both; }
+    .stats-row .stat-card:nth-child(4) { animation: fade-up 0.3s ease 0.20s both; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+    /* ── UPLOAD OVERLAY ── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(8,10,15,0.9);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+
+    .overlay.visible { opacity: 1; pointer-events: auto; }
+
+    .overlay-card {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--r-lg);
+      padding: 40px 48px;
+      text-align: center;
+      max-width: 420px; width: 90%;
+    }
+
+    .overlay-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px; font-weight: 600;
+      color: var(--text); margin-bottom: 8px;
+    }
+
+    .overlay-sub {
+      font-size: 13px; color: var(--text-dim);
+      margin-bottom: 28px; line-height: 1.5;
+    }
+
+    .progress-bar-wrap {
+      background: var(--border);
+      border-radius: 3px; height: 4px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold), var(--amber));
+      border-radius: 3px;
+      width: 0%;
+      transition: width .3s ease;
+      box-shadow: 0 0 8px rgba(201,146,42,0.6);
+    }
+
+    .progress-label {
+      font-size: 11px; color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* notification toast */
+    .toast-wrap {
+      position: fixed; bottom: 28px; right: 28px;
+      display: flex; flex-direction: column; gap: 10px;
+      z-index: 300;
+    }
+
+    .toast {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--r-lg);
+      padding: 14px 18px;
+      min-width: 300px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      transform: translateX(120%);
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+    }
+
+    .toast.show { transform: translateX(0); }
+
+    .toast-icon {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+    }
+
+    .toast.success .toast-icon { background: var(--green-dim); }
+    .toast.error .toast-icon { background: var(--red-dim); }
+
+    .toast-text { flex: 1; }
+    .toast-title { font-size: 13px; font-weight: 500; color: var(--text); }
+    .toast-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+    .toast-close {
+      width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-dim); font-size: 14px; line-height: 1;
+      background: var(--border); border: none;
+      transition: background .12s;
+    }
+
+    .toast-close:hover { background: var(--border2); color: var(--text); }
+
+    @media (max-width: 1100px) {
+      .shell { grid-template-columns: 220px 1fr; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .upload-section, .results-section { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── TOPBAR ── -->
+  <header>
+    <a class="logo" href="#">
+      <div class="logo-mark">EO</div>
+      <span class="logo-text">Exam<span>Ops</span></span>
+    </a>
+    <div class="header-sep"></div>
+    <div class="header-meta">
+      <div class="status-dot">
+        <div class="dot"></div>
+        <span>Azure Functions · Online</span>
+      </div>
+      <span>v2.4.1</span>
+    </div>
+    <button class="header-btn" onclick="showToast('Coming soon','API docs are being updated.')">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <circle cx="8" cy="8" r="6"/><line x1="8" y1="11" x2="8" y2="8"/><circle cx="8" cy="5.5" r=".5" fill="currentColor"/>
+      </svg>
+      Docs
+    </button>
+  </header>
+
+  <!-- ── SIDEBAR ── -->
+  <aside>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Workspace</div>
+      <div class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/>
+          <rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/>
+        </svg>
+        Dashboard
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 2h7l3 3v9H3z"/><path d="M10 2v3h3"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/>
+        </svg>
+        My Documents
+        <span class="nav-badge">14</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 8 9 15 4"/><rect x="1" y="4" width="14" height="9" rx="1"/>
+        </svg>
+        Batch Queue
+        <span class="nav-badge">3</span>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Analytics</div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 13 5 7 9 10 13 3"/><line x1="1" y1="13" x2="15" y2="13"/>
+        </svg>
+        Compliance Trends
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="6"/><polyline points="8 4 8 8 11 10"/>
+        </svg>
+        Audit Log
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Configuration</div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 2h7l3 3v9H3z M6 2v3H3"/><line x1="5" y1="9" x2="11" y2="9"/>
+        </svg>
+        Templates
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.2 3.2l1.4 1.4M11.4 11.4l1.4 1.4M3.2 12.8l1.4-1.4M11.4 4.6l1.4-1.4"/>
+        </svg>
+        Format Rules
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="4"/><line x1="14" y1="14" x2="9.5" y2="9.5"/>
+        </svg>
+        AI Search Index
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="avatar">AL</div>
+        <div class="user-info">
+          <div class="user-name">Aileen Lee</div>
+          <div class="user-role">Exam Coordinator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main>
+
+    <!-- Page Header -->
+    <div class="page-header animate-fade">
+      <div>
+        <h1 class="page-title">Format <em>Examination</em> Papers</h1>
+        <p class="page-sub">Upload a .docx file — the orchestrator applies institutional formatting rules automatically.</p>
+      </div>
+      <button class="btn btn-ghost" onclick="showHistoryModal()">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="6"/><polyline points="8 4 8 8 11 10"/>
+        </svg>
+        View History
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card gold">
+        <div class="stat-label">Jobs Today</div>
+        <div class="stat-value">47</div>
+        <div class="stat-delta up">↑ 12 vs yesterday</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Avg. Compliance</div>
+        <div class="stat-value">94<span style="font-size:18px;color:var(--text-dim)">%</span></div>
+        <div class="stat-delta up">↑ 2.3% this week</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Avg. Proc. Time</div>
+        <div class="stat-value">18<span style="font-size:18px;color:var(--text-dim)">s</span></div>
+        <div class="stat-delta">Stable</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">Failed Jobs</div>
+        <div class="stat-value">3</div>
+        <div class="stat-delta down">↑ 2 vs yesterday</div>
+      </div>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="upload-section animate-fade" style="animation-delay:.15s">
+
+      <div class="upload-zone" id="drop-zone"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="handleDragOver(event)"
+           ondragleave="handleDragLeave(event)"
+           ondrop="handleDrop(event)">
+        <input type="file" id="file-input" accept=".docx" onchange="handleFileSelect(event)"/>
+        <div class="upload-icon-wrap">
+          <svg class="upload-icon" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <div class="upload-title">Drop your exam paper here</div>
+        <div class="upload-sub">
+          Drag & drop a <code style="background:var(--border);padding:1px 5px;border-radius:3px;font-size:11px">.docx</code> file, or click to browse.<br>
+          The orchestrator will auto-apply numbering, spacing &amp; header rules.
+        </div>
+        <div class="upload-constraints">
+          <span>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><line x1="8" y1="5" x2="8" y2="11"/><line x1="5" y1="8" x2="11" y2="8"/></svg>
+            .docx only
+          </span>
+          <span>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><polyline points="8 4 8 8 11 10"/></svg>
+            Max 50 MB
+          </span>
+          <span>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="1 4 8 9 15 4"/><rect x="1" y="4" width="14" height="9" rx="1"/></svg>
+            Results to Teams
+          </span>
+        </div>
+      </div>
+
+      <div class="template-panel">
+        <div class="panel-title">
+          <svg class="panel-title-icon" viewBox="0 0 16 16">
+            <path d="M3 2h7l3 3v9H3z"/><path d="M10 2v3h3"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/>
+          </svg>
+          Select Template
+        </div>
+
+        <div class="template-list">
+          <div class="template-item selected" onclick="selectTemplate(this)">
+            <div class="template-radio"></div>
+            <div class="template-info">
+              <div class="template-name">SUC Standard 2025</div>
+              <div class="template-meta">Updated 14 Feb 2025</div>
+            </div>
+            <span class="template-tag">Default</span>
+          </div>
+          <div class="template-item" onclick="selectTemplate(this)">
+            <div class="template-radio"></div>
+            <div class="template-info">
+              <div class="template-name">Engineering Faculty</div>
+              <div class="template-meta">Updated 8 Jan 2025</div>
+            </div>
+          </div>
+          <div class="template-item" onclick="selectTemplate(this)">
+            <div class="template-radio"></div>
+            <div class="template-info">
+              <div class="template-name">Business &amp; Commerce</div>
+              <div class="template-meta">Updated 3 Jan 2025</div>
+            </div>
+          </div>
+          <div class="template-item" onclick="selectTemplate(this)">
+            <div class="template-radio"></div>
+            <div class="template-info">
+              <div class="template-name">Science &amp; Math</div>
+              <div class="template-meta">Updated 20 Dec 2024</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="format-btn" onclick="startFormatting()" style="width:100%;justify-content:center;display:none">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 8 7 11 12 5"/>
+          </svg>
+          Format Document
+        </button>
+      </div>
+    </div>
+
+    <!-- Pipeline Card -->
+    <div class="pipeline-card" id="pipeline-card">
+      <div class="pipeline-header">
+        <div>
+          <div class="pipeline-title">Processing Pipeline</div>
+          <div class="pipeline-filename" id="pipeline-filename">—</div>
+        </div>
+        <div class="pipeline-pct" id="pipeline-pct">0%</div>
+      </div>
+
+      <div class="pipeline-steps">
+        <div class="pipeline-bar" id="pipeline-bar" style="width:0%"></div>
+
+        <div class="pipeline-step">
+          <div class="step-node" id="step-0">01</div>
+          <div class="step-label" id="step-label-0">File Upload</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-node" id="step-1">02</div>
+          <div class="step-label" id="step-label-1">Template Retrieval</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-node" id="step-2">03</div>
+          <div class="step-label" id="step-label-2">Rule-Based Format</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-node" id="step-3">04</div>
+          <div class="step-label" id="step-label-3">LLM Validation</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-node" id="step-4">05</div>
+          <div class="step-label" id="step-label-4">Diff Generation</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-node" id="step-5">06</div>
+          <div class="step-label" id="step-label-5">Deliver Output</div>
+        </div>
+      </div>
+
+      <div class="pipeline-log" id="pipeline-log"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section animate-fade" id="results-section" style="display:none">
+      <div class="diff-card">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="4" x2="15" y2="4"/><line x1="5" y1="8" x2="15" y2="8"/><line x1="5" y1="12" x2="10" y2="12"/>
+            <circle cx="2" cy="4" r="1" fill="var(--gold)"/><circle cx="2" cy="8" r="1" fill="var(--gold)"/>
+          </svg>
+          Formatting Diff — <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">FIN3201_Final.docx</span>
+        </div>
+        <div class="diff-body">
+          <div class="diff-line del"><span class="diff-line-num">14</span><span class="diff-prefix">−</span><span>Question 1. What is the Fisher equation and its significance?</span></div>
+          <div class="diff-line add"><span class="diff-line-num">14</span><span class="diff-prefix">+</span><span>Q1. What is the Fisher equation and its significance?</span></div>
+          <div class="diff-line ctx"><span class="diff-line-num">15</span><span class="diff-prefix"> </span><span style="color:var(--text-dim)">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(5 marks)</span></div>
+          <div class="diff-line del"><span class="diff-line-num">16</span><span class="diff-prefix">−</span><span>1a) Define nominal interest rate.</span></div>
+          <div class="diff-line add"><span class="diff-line-num">16</span><span class="diff-prefix">+</span><span>(a) Define nominal interest rate.</span></div>
+          <div class="diff-line del"><span class="diff-line-num">17</span><span class="diff-prefix">−</span><span>1b) State two limitations of the model.</span></div>
+          <div class="diff-line add"><span class="diff-line-num">17</span><span class="diff-prefix">+</span><span>(b) State two limitations of the model.</span></div>
+          <div class="diff-line ctx"><span class="diff-line-num">18</span><span class="diff-prefix"> </span><span></span></div>
+          <div class="diff-line del"><span class="diff-line-num">19</span><span class="diff-prefix">−</span><span>DATE : 15 March 2025&nbsp;&nbsp;TIME : 2 hours</span></div>
+          <div class="diff-line add"><span class="diff-line-num">19</span><span class="diff-prefix">+</span><span>DATE : 15 March 2025 &nbsp; TIME : 2 hours</span></div>
+          <div class="diff-line del"><span class="diff-line-num">23</span><span class="diff-prefix">−</span><span>&nbsp;&nbsp;i) Calculate the real rate of return given r = 8%, π = 3%.</span></div>
+          <div class="diff-line add"><span class="diff-line-num">23</span><span class="diff-prefix">+</span><span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(i) Calculate the real rate of return given r = 8%, π = 3%.</span></div>
+          <div class="diff-line del"><span class="diff-line-num">24</span><span class="diff-prefix">−</span><span>Marks: 10</span></div>
+          <div class="diff-line add"><span class="diff-line-num">24</span><span class="diff-prefix">+</span><span>(10 marks)</span></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button class="btn btn-primary" style="font-size:12px;padding:8px 16px" onclick="showToast('Downloading…','FIN3201_Final_formatted.docx is being prepared.')">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v9M4 9l4 4 4-4"/><line x1="2" y1="14" x2="14" y2="14"/></svg>
+            Download .docx
+          </button>
+          <button class="btn btn-ghost" style="font-size:12px;padding:8px 16px" onclick="showToast('Sent to Teams','Diff report posted to your Teams channel.')">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="1 4 8 9 15 4"/><rect x="1" y="4" width="14" height="9" rx="1"/></svg>
+            Post to Teams
+          </button>
+          <button class="btn btn-ghost" style="font-size:12px;padding:8px 16px;margin-left:auto" onclick="showToast('Report ready','HTML diff report downloaded.')">
+            Full Diff Report
+          </button>
+        </div>
+      </div>
+
+      <div class="compliance-card">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 8 7 11 12 5"/><circle cx="8" cy="8" r="6"/>
+          </svg>
+          Compliance Score
+        </div>
+
+        <div class="gauge-wrap" style="height:140px">
+          <svg class="gauge-svg" width="140" height="140" viewBox="0 0 140 140">
+            <circle class="gauge-track" cx="70" cy="70" r="54"
+                    stroke-dasharray="254" stroke-dashoffset="64"
+                    transform="rotate(135 70 70)"/>
+            <circle class="gauge-fill" id="gauge-fill" cx="70" cy="70" r="54"
+                    stroke-dasharray="254" stroke-dashoffset="254"
+                    transform="rotate(135 70 70)"/>
+          </svg>
+          <div class="gauge-center">
+            <div class="gauge-pct" id="gauge-pct">—</div>
+            <div class="gauge-label">compliance</div>
+          </div>
+        </div>
+
+        <div class="fix-grid">
+          <div class="fix-item">
+            <div class="fix-count" id="fix-numbering">—</div>
+            <div class="fix-label">numbering</div>
+          </div>
+          <div class="fix-item">
+            <div class="fix-count" id="fix-spacing">—</div>
+            <div class="fix-label">spacing</div>
+          </div>
+          <div class="fix-item">
+            <div class="fix-count" id="fix-formatting">—</div>
+            <div class="fix-label">formatting</div>
+          </div>
+          <div class="fix-item">
+            <div class="fix-count" id="fix-marks">—</div>
+            <div class="fix-label">marks notation</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Job History Table -->
+    <div class="table-card animate-fade" style="animation-delay:.25s">
+      <div class="table-header">
+        <div class="table-title">Recent Jobs</div>
+        <input class="search-input" type="text" placeholder="Search by filename or ID…" oninput="filterTable(this.value)"/>
+      </div>
+      <table id="job-table">
+        <thead>
+          <tr>
+            <th>Job ID</th>
+            <th>Filename</th>
+            <th>Template</th>
+            <th>Status</th>
+            <th>Score</th>
+            <th>Time</th>
+            <th>Submitted</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="job-tbody">
+          <!-- populated by JS -->
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── UPLOAD OVERLAY ── -->
+<div class="overlay" id="upload-overlay">
+  <div class="overlay-card">
+    <div class="overlay-title">Uploading to Azure Blob</div>
+    <div class="overlay-sub">Transferring your document to the <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--border);padding:1px 5px;border-radius:3px">examops-input</code> container…</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="upload-bar"></div>
+    </div>
+    <div class="progress-label" id="upload-label">Preparing…</div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────
+const JOBS = [
+  { id:'JOB-0091', file:'MATH2301_Midterm.docx',    tpl:'Science & Math',     status:'done',    score:97, time:'12s', submitted:'Today, 14:52' },
+  { id:'JOB-0090', file:'CS3101_Final.docx',         tpl:'SUC Standard 2025',  status:'running', score:null, time:'—',   submitted:'Today, 14:49' },
+  { id:'JOB-0089', file:'FIN3201_Final.docx',        tpl:'Business & Commerce',status:'done',    score:91, time:'19s', submitted:'Today, 14:33' },
+  { id:'JOB-0088', file:'ENG2101_Assignment.docx',   tpl:'Engineering Faculty', status:'done',    score:85, time:'24s', submitted:'Today, 13:17' },
+  { id:'JOB-0087', file:'BIO1101_Quiz.docx',         tpl:'Science & Math',     status:'failed',  score:null, time:'—',   submitted:'Today, 12:04' },
+  { id:'JOB-0086', file:'ACC3201_Final.docx',        tpl:'Business & Commerce',status:'done',    score:99, time:'14s', submitted:'Yesterday, 16:30' },
+  { id:'JOB-0085', file:'PHY2201_Midterm.docx',      tpl:'Science & Math',     status:'done',    score:94, time:'17s', submitted:'Yesterday, 15:12' },
+  { id:'JOB-0084', file:'HIST1201_Essay.docx',       tpl:'SUC Standard 2025',  status:'done',    score:78, time:'31s', submitted:'Yesterday, 11:50' },
+];
+
+// ── TABLE ──────────────────────────────────────────────────────
+function renderTable(jobs) {
+  const tbody = document.getElementById('job-tbody');
+  tbody.innerHTML = jobs.map(j => {
+    const badge = j.status === 'done'
+      ? `<span class="badge done"><span class="badge-dot"></span>Complete</span>`
+      : j.status === 'running'
+      ? `<span class="badge running"><span class="badge-dot"></span>Running</span>`
+      : `<span class="badge failed"><span class="badge-dot"></span>Failed</span>`;
+    const score = j.score !== null
+      ? `<span class="score-pill ${j.score>=90?'score-high':j.score>=75?'score-mid':'score-low'}">${j.score}%</span>`
+      : `<span style="color:var(--text-muted);font-size:11px">—</span>`;
+    return `<tr>
+      <td class="mono">${j.id}</td>
+      <td style="font-weight:500">${j.file}</td>
+      <td class="mono" style="font-size:11px">${j.tpl}</td>
+      <td>${badge}</td>
+      <td>${score}</td>
+      <td class="mono">${j.time}</td>
+      <td class="mono" style="font-size:11px;color:var(--text-muted)">${j.submitted}</td>
+      <td>
+        <div class="row-actions">
+          <div class="icon-btn" title="Download" onclick="showToast('Downloading','${j.file}')">
+            <svg viewBox="0 0 16 16"><path d="M8 2v9M4 9l4 4 4-4"/><line x1="2" y1="14" x2="14" y2="14"/></svg>
+          </div>
+          <div class="icon-btn" title="View diff" onclick="showToast('Opening diff','Loading diff report…')">
+            <svg viewBox="0 0 16 16"><line x1="4" y1="6" x2="12" y2="6"/><line x1="4" y1="10" x2="8" y2="10"/></svg>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterTable(q) {
+  const filtered = q
+    ? JOBS.filter(j => j.file.toLowerCase().includes(q.toLowerCase()) || j.id.toLowerCase().includes(q.toLowerCase()))
+    : JOBS;
+  renderTable(filtered);
+}
+
+renderTable(JOBS);
+
+// ── TEMPLATE SELECT ──────────────────────────────────────────
+function selectTemplate(el) {
+  document.querySelectorAll('.template-item').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// ── DRAG & DROP ──────────────────────────────────────────────
+let selectedFile = null;
+
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.add('drag-over');
+}
+
+function handleDragLeave() {
+  document.getElementById('drop-zone').classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const files = e.dataTransfer.files;
+  if (files.length > 0 && files[0].name.endsWith('.docx')) {
+    processFile(files[0]);
+  } else {
+    showToast('Invalid file', 'Please upload a .docx file only.', 'error');
+  }
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+
+function processFile(file) {
+  selectedFile = file;
+  document.getElementById('format-btn').style.display = 'flex';
+  document.getElementById('drop-zone').querySelector('.upload-title').textContent = file.name;
+  document.getElementById('drop-zone').querySelector('.upload-sub').innerHTML =
+    `<strong style="color:var(--green)">${formatBytes(file.size)}</strong> · Ready to format`;
+  showToast('File selected', `${file.name} is ready to format.`);
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1048576).toFixed(1) + ' MB';
+}
+
+// ── FORMATTING SIMULATION ──────────────────────────────────────
+const PIPELINE_STEPS = [
+  { label:'File Upload',       log:'Uploading to examops-input blob container…', ok:'Blob stored — SHA-256 verified.' },
+  { label:'Template Retrieval',log:'Querying Azure AI Search (top-3 rules)…',    ok:'3 template rules retrieved (similarity ≥ 0.87).' },
+  { label:'Rule-Based Format', log:'RuleBasedFormatter: numbering pass 1 of 3…', ok:'Layer 1 complete — 14 transformations applied.' },
+  { label:'LLM Validation',    log:'GPT-4o-mini: validating ambiguous numbering…',ok:'LLM validation passed — compliance 94%.' },
+  { label:'Diff Generation',   log:'Generating HTML diff + summary stats…',      ok:'Diff report generated (32 changes).' },
+  { label:'Deliver Output',    log:'Writing to examops-output, notifying Teams…', ok:'Output delivered. Job JOB-0092 complete.' },
+];
+
+async function startFormatting() {
+  if (!selectedFile && true) { // allow demo without file
+    selectedFile = { name: 'FIN3201_Final.docx' };
+  }
+
+  // Show upload overlay
+  const overlay = document.getElementById('upload-overlay');
+  const bar = document.getElementById('upload-bar');
+  const label = document.getElementById('upload-label');
+  overlay.classList.add('visible');
+
+  // Simulate upload progress
+  for (let p = 0; p <= 100; p += 4) {
+    bar.style.width = p + '%';
+    label.textContent = `${p}% — transferring bytes…`;
+    await sleep(30);
+  }
+  label.textContent = 'Upload complete ✓';
+  await sleep(400);
+  overlay.classList.remove('visible');
+
+  // Show pipeline
+  const card = document.getElementById('pipeline-card');
+  card.classList.add('visible');
+  document.getElementById('pipeline-filename').textContent = selectedFile.name;
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  clearLog();
+
+  // Step through pipeline
+  for (let i = 0; i < PIPELINE_STEPS.length; i++) {
+    setStepActive(i);
+    addLog('run', PIPELINE_STEPS[i].log);
+    const delay = 800 + Math.random() * 600;
+    await sleep(delay);
+    setStepDone(i);
+    addLog('ok', PIPELINE_STEPS[i].ok);
+    updateProgress(Math.round(((i + 1) / PIPELINE_STEPS.length) * 100));
+    await sleep(180);
+  }
+
+  // Show results
+  await sleep(300);
+  showResults();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function setStepActive(i) {
+  const node = document.getElementById(`step-${i}`);
+  const lbl  = document.getElementById(`step-label-${i}`);
+  node.classList.remove('done');
+  node.classList.add('active');
+  lbl.classList.remove('done');
+  lbl.classList.add('active');
+}
+
+function setStepDone(i) {
+  const node = document.getElementById(`step-${i}`);
+  const lbl  = document.getElementById(`step-label-${i}`);
+  node.classList.remove('active');
+  node.classList.add('done');
+  node.textContent = '✓';
+  lbl.classList.remove('active');
+  lbl.classList.add('done');
+}
+
+function updateProgress(pct) {
+  document.getElementById('pipeline-pct').textContent = pct + '%';
+  const barEl = document.getElementById('pipeline-bar');
+  // bar spans from step 0 center to step 5 center = 80% of container width
+  barEl.style.width = (pct * 0.8) + '%';
+}
+
+let logTimer = null;
+const LOG_TIMES = ['14:58:01','14:58:02','14:58:03','14:58:04','14:58:05',
+                   '14:58:06','14:58:07','14:58:08','14:58:09','14:58:10',
+                   '14:58:11','14:58:12'];
+let logCount = 0;
+
+function clearLog() {
+  document.getElementById('pipeline-log').innerHTML = '';
+  logCount = 0;
+}
+
+function addLog(type, msg) {
+  const log = document.getElementById('pipeline-log');
+  const cls = type === 'ok' ? 'log-ok' : type === 'run' ? 'log-run' : 'log-info';
+  const prefix = type === 'ok' ? '✓' : type === 'run' ? '▶' : 'i';
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts">${LOG_TIMES[logCount % LOG_TIMES.length]}</span><span class="${cls}">[${prefix}] ${msg}</span>`;
+  logCount++;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function showResults() {
+  const section = document.getElementById('results-section');
+  section.style.display = 'grid';
+  section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Animate gauge
+  animateGauge(94);
+  animateCounter('fix-numbering', 8);
+  animateCounter('fix-spacing', 4);
+  animateCounter('fix-formatting', 14);
+  animateCounter('fix-marks', 6);
+
+  showToast('Formatting complete', 'FIN3201_Final.docx — 94% compliance.', 'success');
+}
+
+function animateGauge(target) {
+  const fill = document.getElementById('gauge-fill');
+  const pctEl = document.getElementById('gauge-pct');
+  // Circumference for r=54 is 339.3; we show 254 (75% arc)
+  const arc = 254;
+  const offset = arc - (arc * target / 100);
+  fill.style.strokeDashoffset = offset;
+
+  let cur = 0;
+  const step = () => {
+    cur = Math.min(cur + 2, target);
+    pctEl.textContent = cur + '%';
+    if (cur < target) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function animateCounter(id, target) {
+  const el = document.getElementById(id);
+  let cur = 0;
+  const step = () => {
+    cur = Math.min(cur + 1, target);
+    el.textContent = cur;
+    if (cur < target) setTimeout(step, 40);
+  };
+  setTimeout(step, 400 + Math.random() * 300);
+}
+
+// ── TOAST ────────────────────────────────────────────────────
+function showToast(title, sub, type = 'success') {
+  const wrap = document.getElementById('toast-wrap');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const emoji = type === 'success' ? '✓' : '✕';
+  toast.innerHTML = `
+    <div class="toast-icon">${emoji}</div>
+    <div class="toast-text">
+      <div class="toast-title">${title}</div>
+      <div class="toast-sub">${sub}</div>
+    </div>
+    <button class="toast-close" onclick="this.closest('.toast').remove()">×</button>
+  `;
+  wrap.appendChild(toast);
+  requestAnimationFrame(() => { requestAnimationFrame(() => toast.classList.add('show')); });
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 400);
+  }, 4000);
+}
+
+function showHistoryModal() {
+  showToast('Full history', 'Detailed history view is coming soon.');
+}
+</script>
+</body>
+</html>
