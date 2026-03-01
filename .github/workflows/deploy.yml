@@ -55,10 +55,22 @@ jobs:
           cache: pip
 
       - name: Install runtime dependencies into .python_packages
+        run: pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+
+      - name: Create deployment zip
         run: |
-          pip install -r requirements.txt --target=".python_packages/lib/site-packages" \
-            --only-binary=:all: || \
-          pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+          zip -r deploy.zip . \
+            --exclude ".git/*" \
+            --exclude ".env" \
+            --exclude "__pycache__/*" \
+            --exclude "*.pyc" \
+            --exclude "tests/*" \
+            --exclude "e2e/*" \
+            --exclude "frontend/*" \
+            --exclude "node_modules/*" \
+            --exclude "examops-deploy.zip" \
+            --exclude "deploy.zip"
+          echo "Zip size: $(du -sh deploy.zip | cut -f1)"
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -69,7 +81,7 @@ jobs:
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          package: .
+          package: deploy.zip
           scm-do-build-during-deployment: false
 
       - name: Smoke test deployed function

@@ -1,0 +1,13 @@
+.git*
+.vscode
+__pycache__
+.pytest_cache
+tests
+e2e
+frontend
+*.md
+*.docx
+Dockerfile
+node_modules
+examops-deploy.zip
+.env
