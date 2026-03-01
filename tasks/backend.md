@@ -98,6 +98,20 @@
 
 ---
 
+## Task: Implement scripts/upload_template.py
+**File**: `scripts/upload_template.py`
+**Goal**: Parse sample/ guideline .docx files, extract structured template rules, embed them with ada-002, and upsert into Azure AI Search index `exam-templates`.
+**Steps**:
+1. Parse `sample/Exam Paper Format Guideline 1.docx` and `sample/Marking Scheme Format Guideline 1.docx` with python-docx.
+2. Extract template rules dict: header_text, footer_text, numbering_scheme, marks_pattern, colon_spacing, margin_cm, indentation_cm.
+3. Serialize rules to JSON; create embedding via Azure OpenAI ada-002.
+4. Upsert document with id, title, content (rules JSON), content_vector into Azure AI Search index `exam-templates`.
+5. Accept `--dry-run` flag to print extracted rules without uploading.
+6. Accept `--index-name` override (default: `exam-templates`).
+**Result file**: `tasks/results/upload-template.md`
+
+---
+
 ## Task: Implement SK "Team Leader" CoordinatorAgent
 **File**: `src/agents/coordinator_agent/coordinator_agent.py`, `src/agents/job_context.py`, `src/agents/kernel_setup.py`, `src/agents/plugins/`
 **Goal**: Replace the hard-coded sequential chain with a `ChatCompletionAgent` team leader that delegates pipeline steps to SK plugins via automatic function calling, with a manual-chain fallback.
