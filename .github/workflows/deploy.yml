@@ -85,11 +85,13 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Functions
-        uses: Azure/functions-action@v1
-        with:
-          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          package: deploy.zip
-          scm-do-build-during-deployment: false
+        run: |
+          az functionapp deployment source config-zip \
+            --resource-group rg-examops-prod \
+            --name "${{ env.AZURE_FUNCTIONAPP_NAME }}" \
+            --src deploy.zip \
+            --build-remote false \
+            --timeout 300
 
       - name: Smoke test deployed function
         run: |
