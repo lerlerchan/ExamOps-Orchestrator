@@ -14,12 +14,17 @@ import azure.functions as func
 logger = logging.getLogger(__name__)
 
 # Resolve the HTML file path relative to this module's location.
-# Deployed layout: serve_web/__init__.py  AND  src/web/index.html are both
-# included in the zip, so we walk up two levels from this file.
+#
+# Deployed layout (after workflow staging):
+#   /home/site/wwwroot/
+#     serve_web/__init__.py   ← this file (staged from src/functions/serve_web)
+#     src/web/index.html      ← included in zip from repo root
+#     web/index.html          ← also copied by workflow staging step
+#
 _THIS_DIR = Path(__file__).resolve().parent
-_HTML_PATH = _THIS_DIR.parent.parent / "src" / "web" / "index.html"
-
-# Fallback: try sibling path if deployed at root (after cp in workflow)
+# Primary: src/web/index.html under wwwroot (one level up from serve_web/)
+_HTML_PATH = _THIS_DIR.parent / "src" / "web" / "index.html"
+# Fallback: web/index.html under wwwroot (if workflow stages it there)
 _ALT_HTML_PATH = _THIS_DIR.parent / "web" / "index.html"
 
 

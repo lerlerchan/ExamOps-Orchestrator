@@ -63,6 +63,9 @@ jobs:
           # Our functions live under src/functions/ — copy them to root before zipping.
           cp -r src/functions/format_exam ./format_exam
           cp -r src/functions/serve_web  ./serve_web
+          # Also stage web assets at root so serve_web/__init__.py can find index.html
+          # via both _HTML_PATH (src/web/index.html) and _ALT_HTML_PATH (web/index.html)
+          cp -r src/web ./web
 
       - name: Create deployment zip
         run: |
