@@ -62,6 +62,7 @@ jobs:
           # Azure Functions v1 Python model discovers function dirs at the root of the app.
           # Our functions live under src/functions/ — copy them to root before zipping.
           cp -r src/functions/format_exam ./format_exam
+          cp -r src/functions/serve_web  ./serve_web
 
       - name: Create deployment zip
         run: |
@@ -93,15 +94,25 @@ jobs:
       - name: Smoke test deployed function
         run: |
           sleep 30
-          FUNC_URL="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/format-exam"
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$FUNC_URL")
-          echo "Smoke test HTTP status: $HTTP_STATUS"
-          # Expect 400 (missing form fields) or 401 (auth required) — proves function is reachable
-          if [ "$HTTP_STATUS" != "400" ] && [ "$HTTP_STATUS" != "401" ]; then
-            echo "Unexpected status $HTTP_STATUS — deployment may have failed"
+          BASE="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net"
+
+          # /api/format-exam — anonymous POST, expect 400 (missing fields)
+          FMT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/format-exam")
+          echo "format-exam smoke test HTTP status: $FMT_STATUS"
+          if [ "$FMT_STATUS" != "400" ] && [ "$FMT_STATUS" != "200" ]; then
+            echo "Unexpected format-exam status $FMT_STATUS — deployment may have failed"
             exit 1
           fi
-          echo "Smoke test passed."
+
+          # /api/web — anonymous GET, expect 200 (HTML page)
+          WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/web")
+          echo "web smoke test HTTP status: $WEB_STATUS"
+          if [ "$WEB_STATUS" != "200" ]; then
+            echo "Unexpected web status $WEB_STATUS — frontend not deployed"
+            exit 1
+          fi
+
+          echo "All smoke tests passed."
 
       - name: Azure logout
         if: always()

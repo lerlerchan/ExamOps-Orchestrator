@@ -6,8 +6,8 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["post"],
-      "route": "format-exam"
+      "methods": ["get"],
+      "route": "web"
     },
     {
       "type": "http",

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExamOps Orchestrator — Southern University College</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── SUC Header ───────────────────────────────────────────────────────── */
+    .suc-header {
+      background: linear-gradient(135deg, #003087 0%, #0057b8 60%, #0073e6 100%);
+      color: #fff;
+      padding: 0;
+      box-shadow: 0 2px 12px rgba(0,48,135,0.35);
+    }
+    .suc-header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .suc-logo {
+      width: 56px;
+      height: 56px;
+      background: #fff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 900;
+      color: #003087;
+      letter-spacing: -1px;
+      flex-shrink: 0;
+    }
+    .suc-title { flex: 1; }
+    .suc-title h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+    }
+    .suc-title p {
+      font-size: 0.8rem;
+      opacity: 0.82;
+      margin-top: 3px;
+      letter-spacing: 0.02em;
+    }
+    .suc-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    /* ── Main layout ──────────────────────────────────────────────────────── */
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 36px 24px 60px;
+    }
+    .page-intro {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .page-intro h2 {
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #003087;
+      margin-bottom: 8px;
+    }
+    .page-intro p {
+      color: #555;
+      font-size: 0.95rem;
+      max-width: 580px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── Upload card ──────────────────────────────────────────────────────── */
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      padding: 36px;
+      margin-bottom: 24px;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #003087;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title svg { flex-shrink: 0; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2.5px dashed #b0c4e8;
+      border-radius: 12px;
+      padding: 52px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: #f8faff;
+      position: relative;
+    }
+    .drop-zone.drag-over {
+      border-color: #0057b8;
+      background: #eef4ff;
+    }
+    .drop-zone.has-file {
+      border-color: #2e7d32;
+      background: #f0faf1;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .drop-icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+      line-height: 1;
+    }
+    .drop-zone h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    .drop-zone p {
+      font-size: 0.85rem;
+      color: #777;
+    }
+    .file-selected {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 10px 16px;
+      background: #e8f5e9;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #2e7d32;
+    }
+    .file-selected.visible { display: flex; }
+
+    /* Form row */
+    .form-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      align-items: flex-end;
+    }
+    .form-group { flex: 1; }
+    .form-group label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+      letter-spacing: 0.01em;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #d0d9e8;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      color: #222;
+      transition: border-color 0.2s;
+      background: #fafcff;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #0057b8;
+      background: #fff;
+    }
+
+    /* Submit button */
+    .btn-primary {
+      padding: 11px 28px;
+      background: linear-gradient(135deg, #0057b8, #003087);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-secondary {
+      padding: 9px 20px;
+      background: #fff;
+      color: #0057b8;
+      border: 1.5px solid #0057b8;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-secondary:hover { background: #f0f5ff; }
+
+    /* ── Progress ─────────────────────────────────────────────────────────── */
+    .progress-card { display: none; }
+    .progress-card.visible { display: block; }
+    .progress-steps {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+    }
+    .step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    .step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      width: 100%;
+      height: 2px;
+      background: #e0e7ef;
+      z-index: 0;
+    }
+    .step.done:not(:last-child)::after { background: #0057b8; }
+    .step-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #e0e7ef;
+      color: #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      z-index: 1;
+      position: relative;
+      transition: background 0.3s, color 0.3s;
+    }
+    .step.active .step-dot {
+      background: #0057b8;
+      color: #fff;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .step.done .step-dot { background: #2e7d32; color: #fff; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0,87,184,0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(0,87,184,0); }
+    }
+    .step-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #999;
+      margin-top: 8px;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+    .step.active .step-label, .step.done .step-label { color: #003087; }
+
+    .progress-bar-wrap {
+      background: #e8eef6;
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #0057b8, #0073e6);
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.6s ease;
+    }
+    .progress-status {
+      text-align: center;
+      font-size: 0.88rem;
+      color: #555;
+      font-style: italic;
+    }
+
+    /* ── Results ──────────────────────────────────────────────────────────── */
+    .results-card { display: none; }
+    .results-card.visible { display: block; }
+
+    .score-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .score-big {
+      background: linear-gradient(135deg, #003087, #0073e6);
+      color: #fff;
+      border-radius: 12px;
+      padding: 24px 32px;
+      text-align: center;
+      min-width: 160px;
+    }
+    .score-big .score-number {
+      font-size: 3rem;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -2px;
+    }
+    .score-big .score-label {
+      font-size: 0.78rem;
+      opacity: 0.85;
+      margin-top: 6px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .score-categories {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .category-item {
+      background: #f5f8ff;
+      border: 1px solid #d8e4f5;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .category-item .cat-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #444;
+    }
+    .category-item .cat-val {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #0057b8;
+    }
+    .category-item .cat-val.zero { color: #999; }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .status-badge.success { background: #e8f5e9; color: #2e7d32; }
+    .status-badge.partial { background: #fff8e1; color: #f57f17; }
+    .status-badge.failed  { background: #ffebee; color: #c62828; }
+
+    /* Download row */
+    .download-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    /* Diff section */
+    .diff-section {
+      margin-top: 28px;
+      border-top: 1.5px solid #e8eef6;
+      padding-top: 24px;
+    }
+    .diff-section h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #003087;
+      margin-bottom: 14px;
+    }
+    .diff-frame-wrap {
+      border: 1px solid #d0d9e8;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .diff-frame {
+      width: 100%;
+      border: none;
+      min-height: 420px;
+      background: #fff;
+      display: block;
+    }
+
+    /* ── Error state ──────────────────────────────────────────────────────── */
+    .error-box {
+      background: #ffebee;
+      border: 1.5px solid #ef9a9a;
+      border-radius: 10px;
+      padding: 18px 20px;
+      color: #c62828;
+      font-size: 0.9rem;
+      display: none;
+      margin-top: 16px;
+    }
+    .error-box.visible { display: block; }
+    .error-box strong { display: block; margin-bottom: 6px; }
+
+    /* ── Footer ───────────────────────────────────────────────────────────── */
+    .page-footer {
+      text-align: center;
+      margin-top: 48px;
+      font-size: 0.78rem;
+      color: #aaa;
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .score-categories { grid-template-columns: 1fr; }
+      .form-row { flex-direction: column; }
+      .score-row { flex-direction: column; }
+      .suc-badge { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── SUC Header ──────────────────────────────────────────────────────────── -->
+<header class="suc-header">
+  <div class="suc-header-inner">
+    <div class="suc-logo">SUC</div>
+    <div class="suc-title">
+      <h1>ExamOps Orchestrator</h1>
+      <p>Southern University College &mdash; Faculty of Engineering &amp; IT</p>
+    </div>
+    <div class="suc-badge">AI-Powered</div>
+  </div>
+</header>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <div class="page-intro">
+    <h2>Automated Exam Paper Formatter</h2>
+    <p>
+      Upload a <code>.docx</code> exam paper and the system will automatically
+      correct numbering, spacing, marks notation, and headers to comply with
+      SUC institutional formatting standards.
+    </p>
+  </div>
+
+  <!-- Upload card -->
+  <div class="card" id="upload-card">
+    <div class="card-title">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+      Upload Exam Paper
+    </div>
+
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".docx" />
+      <div class="drop-icon">📄</div>
+      <h3>Drag &amp; drop your <code>.docx</code> file here</h3>
+      <p>or click to browse — Word documents only (.docx)</p>
+    </div>
+    <div class="file-selected" id="file-selected">
+      <span>✅</span>
+      <span id="file-name-display"></span>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="user-id-input">Staff / Student ID (optional)</label>
+        <input type="text" id="user-id-input" placeholder="e.g. L001234 or your email" />
+      </div>
+      <button class="btn-primary" id="submit-btn" disabled>
+        Format Document →
+      </button>
+    </div>
+
+    <div class="error-box" id="error-box">
+      <strong>Error</strong>
+      <span id="error-msg"></span>
+    </div>
+  </div>
+
+  <!-- Progress card -->
+  <div class="card progress-card" id="progress-card">
+    <div class="card-title">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      Processing
+    </div>
+
+    <div class="progress-steps" id="progress-steps">
+      <div class="step" id="step-1">
+        <div class="step-dot">1</div>
+        <div class="step-label">Uploading</div>
+      </div>
+      <div class="step" id="step-2">
+        <div class="step-dot">2</div>
+        <div class="step-label">Retrieving Template</div>
+      </div>
+      <div class="step" id="step-3">
+        <div class="step-dot">3</div>
+        <div class="step-label">Formatting</div>
+      </div>
+      <div class="step" id="step-4">
+        <div class="step-dot">4</div>
+        <div class="step-label">LLM Validation</div>
+      </div>
+      <div class="step" id="step-5">
+        <div class="step-dot">5</div>
+        <div class="step-label">Generating Diff</div>
+      </div>
+      <div class="step" id="step-6">
+        <div class="step-dot">✓</div>
+        <div class="step-label">Complete</div>
+      </div>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="progress-status" id="progress-status">Uploading document…</div>
+  </div>
+
+  <!-- Results card -->
+  <div class="card results-card" id="results-card">
+    <div class="card-title">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      Formatting Results
+    </div>
+
+    <div id="status-badge-wrap"></div>
+
+    <div class="score-row">
+      <div class="score-big">
+        <div class="score-number" id="score-number">—</div>
+        <div class="score-label">Compliance Score</div>
+      </div>
+      <div class="score-categories" id="category-grid"></div>
+    </div>
+
+    <div class="download-row" id="download-row"></div>
+
+    <div class="diff-section" id="diff-section" style="display:none">
+      <h3>📋 Document Diff Report</h3>
+      <div class="diff-frame-wrap">
+        <iframe class="diff-frame" id="diff-frame" title="Diff Report"></iframe>
+      </div>
+    </div>
+
+    <div style="margin-top:24px">
+      <button class="btn-primary" onclick="resetUI()" style="background:linear-gradient(135deg,#455a64,#263238)">
+        ← Format Another Document
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<footer class="page-footer">
+  ExamOps Orchestrator &mdash; Southern University College &mdash; Faculty of Engineering &amp; IT<br/>
+  Powered by Azure Functions &bull; Azure AI Foundry &bull; python-docx
+</footer>
+
+<script>
+/* ── State ────────────────────────────────────────────────────────────────── */
+let selectedFile = null;
+
+const API_BASE = '';   // same origin when served by /api/web
+
+/* ── DOM refs ─────────────────────────────────────────────────────────────── */
+const dropZone        = document.getElementById('drop-zone');
+const fileInput       = document.getElementById('file-input');
+const fileSelected    = document.getElementById('file-selected');
+const fileNameDisplay = document.getElementById('file-name-display');
+const submitBtn       = document.getElementById('submit-btn');
+const errorBox        = document.getElementById('error-box');
+const errorMsg        = document.getElementById('error-msg');
+const uploadCard      = document.getElementById('upload-card');
+const progressCard    = document.getElementById('progress-card');
+const resultsCard     = document.getElementById('results-card');
+
+/* ── Drag-drop ────────────────────────────────────────────────────────────── */
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFileSelect(f);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFileSelect(fileInput.files[0]);
+});
+
+function handleFileSelect(f) {
+  if (!f.name.toLowerCase().endsWith('.docx')) {
+    showError('Only .docx files are supported. Please select a Word document.');
+    return;
+  }
+  selectedFile = f;
+  fileNameDisplay.textContent = f.name + ' (' + (f.size / 1024).toFixed(1) + ' KB)';
+  fileSelected.classList.add('visible');
+  dropZone.classList.add('has-file');
+  submitBtn.disabled = false;
+  hideError();
+}
+
+/* ── Submit ───────────────────────────────────────────────────────────────── */
+submitBtn.addEventListener('click', startFormatting);
+
+async function startFormatting() {
+  if (!selectedFile) return;
+  hideError();
+  showProgress();
+
+  const userId = document.getElementById('user-id-input').value.trim() || 'web-user';
+  const formData = new FormData();
+  formData.append('file', selectedFile, selectedFile.name);
+  formData.append('user_id', userId);
+
+  // Simulate step progression while the real call runs
+  const stepTimings = [500, 2000, 4000, 6500, 9000];
+  for (let i = 1; i <= 5; i++) {
+    setTimeout(() => advanceStep(i), stepTimings[i - 1]);
+  }
+
+  try {
+    const endpoint = '/api/format-exam';
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await resp.json().catch(() => ({ error: 'Invalid response from server.' }));
+
+    if (!resp.ok || data.error) {
+      throw new Error(data.error || `Server error (HTTP ${resp.status})`);
+    }
+
+    advanceStep(6);
+    setTimeout(() => showResults(data), 800);
+  } catch (err) {
+    showUpload();
+    showError(err.message || 'An unexpected error occurred. Please try again.');
+  }
+}
+
+/* ── Progress helpers ─────────────────────────────────────────────────────── */
+const stepLabels = [
+  'Uploading document…',
+  'Retrieving formatting template…',
+  'Applying formatting rules (Layer 1)…',
+  'Running LLM compliance validation (Layer 2)…',
+  'Generating diff report…',
+  'Processing complete!',
+];
+
+function advanceStep(n) {
+  for (let i = 1; i <= 6; i++) {
+    const el = document.getElementById('step-' + i);
+    el.classList.remove('active', 'done');
+    if (i < n) el.classList.add('done');
+    if (i === n) el.classList.add('active');
+  }
+  const pct = Math.round((n / 6) * 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-status').textContent = stepLabels[n - 1] || '';
+}
+
+/* ── Results ──────────────────────────────────────────────────────────────── */
+function showResults(data) {
+  progressCard.classList.remove('visible');
+  resultsCard.classList.add('visible');
+
+  // Status badge
+  const status = data.status || 'unknown';
+  const badgeEl = document.getElementById('status-badge-wrap');
+  const icon = status === 'success' ? '✅' : status === 'partial' ? '⚠️' : '❌';
+  const label = status === 'partial' ? 'Partial (Rule-Based Only)' : status.charAt(0).toUpperCase() + status.slice(1);
+  badgeEl.innerHTML = `<span class="status-badge ${status}">${icon} ${label}</span>`;
+
+  // Score
+  const score = data.compliance_score;
+  const scoreEl = document.getElementById('score-number');
+  scoreEl.textContent = score !== null && score !== undefined ? score.toFixed(1) + '%' : 'N/A';
+
+  // Category grid
+  const categories = [
+    { label: 'Numbering Fixes', key: 'numbering_fixes' },
+    { label: 'Spacing Fixes',   key: 'spacing_fixes' },
+    { label: 'Marks Fixes',     key: 'mark_formatting_fixes' },
+    { label: 'Indent Fixes',    key: 'indentation_fixes' },
+  ];
+  const stats = data.stats || {};
+  const grid = document.getElementById('category-grid');
+  grid.innerHTML = categories.map(c => {
+    const val = stats[c.key] ?? '—';
+    const isZero = val === 0 || val === '—';
+    return `<div class="category-item">
+      <span class="cat-name">${c.label}</span>
+      <span class="cat-val ${isZero ? 'zero' : ''}">${val}</span>
+    </div>`;
+  }).join('');
+
+  // Download buttons
+  const dlRow = document.getElementById('download-row');
+  dlRow.innerHTML = '';
+  if (data.formatted_url) {
+    const a = document.createElement('a');
+    a.href = data.formatted_url;
+    a.className = 'btn-secondary';
+    a.download = '';
+    a.innerHTML = '⬇️ Download Formatted .docx';
+    dlRow.appendChild(a);
+  }
+  if (data.diff_url) {
+    const a = document.createElement('a');
+    a.href = data.diff_url;
+    a.className = 'btn-secondary';
+    a.download = '';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.innerHTML = '📋 Download Diff Report';
+    dlRow.appendChild(a);
+  }
+  if (data.onedrive_link) {
+    const a = document.createElement('a');
+    a.href = data.onedrive_link;
+    a.className = 'btn-secondary';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.innerHTML = '☁️ Open in OneDrive';
+    dlRow.appendChild(a);
+  }
+
+  // Inline diff
+  if (data.diff_html) {
+    const diffSection = document.getElementById('diff-section');
+    diffSection.style.display = 'block';
+    const iframe = document.getElementById('diff-frame');
+    const blob = new Blob([data.diff_html], { type: 'text/html' });
+    iframe.src = URL.createObjectURL(blob);
+    iframe.onload = () => {
+      try {
+        const h = iframe.contentDocument.body.scrollHeight;
+        iframe.style.height = Math.max(h + 40, 420) + 'px';
+      } catch (_) {}
+    };
+  }
+}
+
+/* ── UI state helpers ─────────────────────────────────────────────────────── */
+function showProgress() {
+  uploadCard.style.display = 'none';
+  progressCard.classList.add('visible');
+  resultsCard.classList.remove('visible');
+  advanceStep(1);
+}
+
+function showUpload() {
+  uploadCard.style.display = '';
+  progressCard.classList.remove('visible');
+  resultsCard.classList.remove('visible');
+}
+
+function showError(msg) {
+  errorBox.classList.add('visible');
+  errorMsg.textContent = msg;
+}
+
+function hideError() {
+  errorBox.classList.remove('visible');
+}
+
+function resetUI() {
+  selectedFile = null;
+  fileInput.value = '';
+  fileSelected.classList.remove('visible');
+  dropZone.classList.remove('has-file');
+  submitBtn.disabled = true;
+  document.getElementById('diff-section').style.display = 'none';
+  hideError();
+  showUpload();
+}
+</script>
+
+</body>
+</html>

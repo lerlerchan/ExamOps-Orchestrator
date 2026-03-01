@@ -102,8 +102,16 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     }
     status_code = error_to_status.get(result.get("error"), 200)
 
+    # Add CORS headers so the web UI (served from the same origin) can call this
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    }
+
     return func.HttpResponse(
         json.dumps(result),
         status_code=status_code,
         mimetype="application/json",
+        headers=headers,
     )
