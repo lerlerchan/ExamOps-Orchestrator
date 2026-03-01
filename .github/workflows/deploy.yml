@@ -57,6 +57,12 @@ jobs:
       - name: Install runtime dependencies into .python_packages
         run: pip install -r requirements.txt --target=".python_packages/lib/site-packages"
 
+      - name: Stage function directories at deployment root
+        run: |
+          # Azure Functions v1 Python model discovers function dirs at the root of the app.
+          # Our functions live under src/functions/ — copy them to root before zipping.
+          cp -r src/functions/format_exam ./format_exam
+
       - name: Create deployment zip
         run: |
           zip -r deploy.zip . \
