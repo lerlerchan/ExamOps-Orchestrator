@@ -3,7 +3,7 @@ active: true
 iteration: 1
 max_iterations: 0
 completion_promise: "DONE"
-started_at: "2026-03-01T13:40:27Z"
+started_at: "2026-03-01T21:13:19Z"
 ---
 
-Check the current repo structure and tell me what source code files actually exist vs what's planned in claude.md. Then prioritize and start implementing the core FormattingEngineAgent (Layer 1 rule-based formatter using python-docx) first since that's the heart of the system. Follow the orchestrator workflow in claude.md - write task files to tasks/backend.md first, then execute. If you hit any rate limit, wait and retry automatically. Auto approve all steps.
+Create a simple but polished web frontend for ExamOps Orchestrator at src/web/index.html - single page with drag-drop .docx upload zone, progress indicator during processing, then display compliance score with category breakdown, color-coded HTML diff report inline, and download buttons for formatted .docx and diff report. Style it professionally with SUC branding (Southern University College, Faculty of Engineering and IT). Add a /api/web route to the Azure Function that serves this static page. Update the Function App auth settings to allow unauthenticated access to /api/web and /api/format-exam endpoints. Deploy to func-examops-prod via GitHub Actions. Run all tests after changes, fix any failures. If you hit any rate limit, wait and retry automatically. Auto approve all steps.
