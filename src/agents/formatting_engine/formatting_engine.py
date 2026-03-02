@@ -248,6 +248,11 @@ class LLMValidator:
     def __init__(self) -> None:
         self._endpoint = os.getenv("AZURE_FOUNDRY_ENDPOINT")
         self._api_key = os.getenv("AZURE_FOUNDRY_KEY")
+        try:
+            from src.utils.llm_client import LLMClient
+            self._llm = LLMClient()
+        except Exception:
+            self._llm = None
 
     async def validate(
         self,
@@ -297,10 +302,7 @@ class LLMValidator:
         formatted: Document,
         template_rules: dict,
     ) -> dict:
-        """Internal: build prompt and call GPT-4o-mini."""
-        from azure.ai.projects import AIProjectClient
-        from azure.identity import DefaultAzureCredential
-
+        """Internal: build prompt and call LLMClient (Azure OpenAI → GitHub Models)."""
         original_text = "\n".join(p.text for p in original.paragraphs)
         formatted_text = "\n".join(p.text for p in formatted.paragraphs)
 
@@ -310,22 +312,30 @@ class LLMValidator:
             f"FORMATTED DOCUMENT:\n{formatted_text[:4000]}"
         )
 
-        client = AIProjectClient(
-            endpoint=self._endpoint,
-            credential=DefaultAzureCredential(),
-        )
+        messages = [
+            {"role": "system", "content": self.SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ]
 
-        response = client.inference.get_chat_completions(
-            model=os.getenv("AZURE_FOUNDRY_DEPLOYMENT", "gpt-4o-mini"),
-            messages=[
-                {"role": "system", "content": self.SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.1,
-            timeout=30,
-        )
+        if self._llm:
+            raw = await self._llm.chat(messages, temperature=0.1, max_tokens=1024)
+        else:
+            # Last-resort: try AIProjectClient (original implementation)
+            from azure.ai.projects import AIProjectClient
+            from azure.identity import DefaultAzureCredential
 
-        raw = response.choices[0].message.content.strip()
+            client = AIProjectClient(
+                endpoint=self._endpoint,
+                credential=DefaultAzureCredential(),
+            )
+            response = client.inference.get_chat_completions(
+                model=os.getenv("AZURE_FOUNDRY_DEPLOYMENT", "gpt-4o-mini"),
+                messages=messages,
+                temperature=0.1,
+                timeout=30,
+            )
+            raw = response.choices[0].message.content.strip()
+
         result = json.loads(raw)
         result["fallback_mode"] = False
         return result

@@ -1,21 +1,23 @@
 """
 SyllabusAgent — extract CLO and PLO lists from a .docx or .pdf syllabus.
 
+Uses LLMClient for Azure OpenAI → GitHub Models fallback on 429.
+
 Environment variables required:
     AZURE_OPENAI_ENDPOINT
     AZURE_OPENAI_KEY
     AZURE_OPENAI_DEPLOYMENT   (default: gpt-4o-mini)
+    GITHUB_TOKEN              (optional fallback — models:read scope)
     AZURE_STORAGE_CONNECTION_STRING
 """
 
 import io
+import json
 import logging
 import os
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
-
-OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
 
 _EXTRACT_PROMPT = """You are an academic curriculum analyst. Extract ALL Course Learning Outcomes (CLOs) and Programme Learning Outcomes (PLOs) from the provided syllabus text.
 
@@ -45,7 +47,7 @@ def _extract_text_from_docx(data: bytes) -> str:
 
 
 def _extract_text_from_pdf(data: bytes) -> str:
-    """Extract plain text from a PDF (best-effort using lxml/fallback)."""
+    """Extract plain text from a PDF (best-effort using pdfplumber/fallback)."""
     try:
         import pdfplumber
 
@@ -53,7 +55,6 @@ def _extract_text_from_pdf(data: bytes) -> str:
             pages = [page.extract_text() or "" for page in pdf.pages]
         return "\n".join(pages)
     except Exception:
-        # Fallback: treat bytes as UTF-8 text (works for text-based PDFs)
         try:
             return data.decode("utf-8", errors="replace")
         except Exception:
@@ -62,12 +63,15 @@ def _extract_text_from_pdf(data: bytes) -> str:
 
 class SyllabusAgent:
     """
-    Extracts CLO and PLO lists from a syllabus document using GPT-4o-mini.
+    Extracts CLO and PLO lists from a syllabus document.
+
+    Uses LLMClient with Azure OpenAI primary and GitHub Models fallback.
     """
 
     def __init__(self) -> None:
-        self._openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        self._openai_key = os.getenv("AZURE_OPENAI_KEY")
+        from src.utils.llm_client import LLMClient
+
+        self._llm = LLMClient()
 
     async def process(
         self, file_bytes: bytes, filename: str, session_id: str
@@ -83,14 +87,12 @@ class SyllabusAgent:
         Returns:
             dict with keys ``clo_list`` and ``plo_list``.
         """
-        # Extract text based on file type
         fname_lower = filename.lower()
         if fname_lower.endswith(".docx"):
             text = _extract_text_from_docx(file_bytes)
         elif fname_lower.endswith(".pdf"):
             text = _extract_text_from_pdf(file_bytes)
         else:
-            # Attempt as docx, fall back to raw text
             try:
                 text = _extract_text_from_docx(file_bytes)
             except Exception:
@@ -100,36 +102,22 @@ class SyllabusAgent:
             logger.warning("No text extracted from syllabus %s", filename)
             return {"clo_list": [], "plo_list": []}
 
-        # Trim to fit GPT context
+        # Trim to fit model context
         text_excerpt = text[:12000]
 
-        # Call GPT-4o-mini via Azure OpenAI
         result = await self._call_llm(text_excerpt)
-
-        # Persist to session
         await self._update_session(session_id, result)
         return result
 
     async def _call_llm(self, text: str) -> Dict[str, List[str]]:
-        import json
-        from openai import AzureOpenAI
-
-        client = AzureOpenAI(
-            azure_endpoint=self._openai_endpoint,
-            api_key=self._openai_key,
-            api_version="2024-02-01",
-        )
-        response = client.chat.completions.create(
-            model=OPENAI_DEPLOYMENT,
-            messages=[
-                {"role": "user", "content": _EXTRACT_PROMPT + text},
-            ],
+        content = await self._llm.chat(
+            messages=[{"role": "user", "content": _EXTRACT_PROMPT + text}],
             temperature=0.0,
             max_tokens=1024,
         )
-        content = response.choices[0].message.content.strip()
 
         # Strip markdown code fences if present
+        content = content.strip()
         if content.startswith("```"):
             content = content.split("```")[1]
             if content.startswith("json"):

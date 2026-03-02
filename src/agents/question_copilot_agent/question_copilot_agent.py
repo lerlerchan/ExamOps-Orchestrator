@@ -1,6 +1,7 @@
 """
 QuestionCopilotAgent — streaming RAG chat agent for exam question generation.
 
+Uses LLMClient for Azure OpenAI → GitHub Models fallback on 429.
 Uses Azure AI Search over indexed learning materials to ground responses.
 Yields SSE-compatible token strings. Each full response includes a suggested
 CLO mapping and marks value.
@@ -9,6 +10,7 @@ Environment variables required:
     AZURE_OPENAI_ENDPOINT
     AZURE_OPENAI_KEY
     AZURE_OPENAI_DEPLOYMENT   (default: gpt-4o-mini)
+    GITHUB_TOKEN              (optional fallback)
     AZURE_SEARCH_ENDPOINT
     AZURE_SEARCH_KEY
     AZURE_EMBEDDING_MODEL     (default: text-embedding-ada-002)
@@ -21,7 +23,6 @@ from typing import AsyncIterator, List
 
 logger = logging.getLogger(__name__)
 
-OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
 EMBEDDING_MODEL = os.getenv("AZURE_EMBEDDING_MODEL", "text-embedding-ada-002")
 MATERIALS_INDEX = os.getenv("SEARCH_MATERIALS_INDEX", "exam-materials")
 
@@ -59,10 +60,13 @@ class QuestionCopilotAgent:
     """
 
     def __init__(self) -> None:
-        self._openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        self._openai_key = os.getenv("AZURE_OPENAI_KEY")
+        from src.utils.llm_client import LLMClient
+
+        self._llm = LLMClient()
         self._search_endpoint = os.getenv("AZURE_SEARCH_ENDPOINT")
         self._search_key = os.getenv("AZURE_SEARCH_KEY")
+        self._openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        self._openai_key = os.getenv("AZURE_OPENAI_KEY")
 
     async def stream(
         self,
@@ -72,46 +76,37 @@ class QuestionCopilotAgent:
     ) -> AsyncIterator[str]:
         """
         Retrieve relevant context from AI Search and stream GPT response tokens.
+        Falls back to GitHub Models if Azure OpenAI returns 429.
 
         Yields:
-            SSE-compatible strings. The final token is a JSON metadata block.
+            Token strings for SSE streaming.
         """
         clo_list = clo_list or []
 
-        # Retrieve context from Azure AI Search
         context = await self._retrieve_context(session_id, message)
 
-        # Build prompt
-        clos_str = "\n".join(f"- {c}" for c in clo_list) if clo_list else "No CLOs loaded yet."
+        clos_str = (
+            "\n".join(f"- {c}" for c in clo_list)
+            if clo_list
+            else "No CLOs loaded yet."
+        )
         prompt = _RAG_PROMPT_TEMPLATE.format(
             context=context[:6000],
             clos=clos_str,
             message=message,
         )
 
-        # Stream from Azure OpenAI
-        from openai import AzureOpenAI
+        messages = [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
 
-        client = AzureOpenAI(
-            azure_endpoint=self._openai_endpoint,
-            api_key=self._openai_key,
-            api_version="2024-02-01",
-        )
-
-        stream = client.chat.completions.create(
-            model=OPENAI_DEPLOYMENT,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            stream=True,
+        async for token in self._llm.stream(
+            messages=messages,
             temperature=0.7,
             max_tokens=1024,
-        )
-
-        for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+        ):
+            yield token
 
     async def _retrieve_context(self, session_id: str, query: str) -> str:
         """Retrieve relevant text chunks from Azure AI Search."""
@@ -152,7 +147,6 @@ class QuestionCopilotAgent:
             )
 
             if not results:
-                # Fall back to unfiltered search if session has no indexed materials yet
                 results = list(
                     search_client.search(
                         search_text=query,
@@ -167,4 +161,7 @@ class QuestionCopilotAgent:
 
         except Exception as exc:
             logger.warning("AI Search retrieval failed: %s", exc)
-            return "(No learning materials indexed yet. Generating question from general knowledge.)"
+            return (
+                "(No learning materials indexed yet. "
+                "Generating question from general knowledge.)"
+            )

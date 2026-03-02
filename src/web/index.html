@@ -859,32 +859,42 @@ async function submitStep1() {
     return;
   }
 
-  showAlert('alert1', '<span class="spinner"></span>Extracting CLOs & PLOs…', 'info');
+  const btn = document.querySelector('#view1 .btn-primary');
+  if (btn) btn.disabled = true;
+  showAlert('alert1', '<span class="spinner"></span>Extracting CLOs &amp; PLOs… (may take up to 60s)', 'info');
+
+  // Abort after 120 seconds so spinner never runs forever
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 120000);
 
   try {
-    let res;
+    const form = new FormData();
     if (fileInput.files.length) {
-      const form = new FormData();
       form.append('file', fileInput.files[0]);
-      if (sessionId) form.append('session_id', sessionId);
-      res = await fetch(`${API_BASE}/api/upload-syllabus`, {
-        method: 'POST',
-        headers: sessionId ? { 'X-Session-ID': sessionId } : {},
-        body: form,
-      });
     } else {
-      const form = new FormData();
       form.append('sharepoint_url', spUrl);
-      if (sessionId) form.append('session_id', sessionId);
-      res = await fetch(`${API_BASE}/api/upload-syllabus`, {
-        method: 'POST',
-        headers: sessionId ? { 'X-Session-ID': sessionId } : {},
-        body: form,
-      });
+    }
+    if (sessionId) form.append('session_id', sessionId);
+
+    const res = await fetch(`${API_BASE}/api/upload-syllabus`, {
+      method: 'POST',
+      headers: sessionId ? { 'X-Session-ID': sessionId } : {},
+      body: form,
+      signal: ctrl.signal,
+    });
+
+    clearTimeout(timer);
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (_) {
+      throw new Error(`Server returned ${res.status} ${res.statusText}`);
     }
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || res.statusText);
+    if (!res.ok) {
+      throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+    }
 
     setSession(data.session_id);
     renderCloResult(data.clo_list || [], data.plo_list || []);
@@ -892,7 +902,13 @@ async function submitStep1() {
     unlockStep(1);
 
   } catch (err) {
-    showAlert('alert1', `❌ ${err.message}`, 'error');
+    clearTimeout(timer);
+    const msg = err.name === 'AbortError'
+      ? 'Request timed out after 2 minutes. The AI may be rate-limited — please try again.'
+      : err.message;
+    showAlert('alert1', `❌ ${msg}`, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -1001,11 +1017,16 @@ async function sendChatMessage() {
   const asstEl = appendChatMsg('', 'assistant streaming');
   let fullText = '';
 
+  // Abort if no response within 90 seconds
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90000);
+
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ session_id: sessionId, message: msg }),
+      signal: ctrl.signal,
     });
 
     if (!res.ok) {
@@ -1031,13 +1052,17 @@ async function sendChatMessage() {
         if (payload === '[DONE]') break;
         try {
           const token = JSON.parse(payload);
+          if (token && token.error) throw new Error(token.error);
           fullText += token;
           asstEl.querySelector('.msg-text').textContent = fullText;
           scrollChatToBottom();
-        } catch (e) { /* ignore parse errors */ }
+        } catch (e) {
+          if (e.message && !e.message.startsWith('Unexpected')) throw e;
+        }
       }
     }
 
+    clearTimeout(timer);
     asstEl.classList.remove('streaming');
 
     // Parse suggestion block for "Add to Exam" button
@@ -1061,11 +1086,16 @@ async function sendChatMessage() {
     }
 
   } catch (err) {
-    asstEl.querySelector('.msg-text').textContent = `Error: ${err.message}`;
+    clearTimeout(timer);
+    asstEl.classList.remove('streaming');
+    const msg = err.name === 'AbortError'
+      ? 'Request timed out after 90 seconds. The AI may be rate-limited — please try again.'
+      : `Error: ${err.message}`;
+    asstEl.querySelector('.msg-text').textContent = msg;
+  } finally {
+    btn.disabled = false;
+    scrollChatToBottom();
   }
-
-  btn.disabled = false;
-  scrollChatToBottom();
 }
 
 function appendChatMsg(text, cssClass) {
