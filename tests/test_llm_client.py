@@ -200,3 +200,60 @@ def test_ollama_backend_init(monkeypatch):
     finally:
         _openai_stub.AsyncOpenAI = original_AsyncOpenAI
         _openai_stub.AsyncAzureOpenAI = original_AsyncAzureOpenAI
+
+
+# ---------------------------------------------------------------------------
+# Test: GitHub Models backend init
+# ---------------------------------------------------------------------------
+
+def test_github_backend_init(monkeypatch):
+    """LLM_BACKEND=github → _primary_model is Phi-3.5-mini-instruct via AsyncOpenAI."""
+    from src.utils.llm_client import _GITHUB_MODELS_BASE_URL
+
+    monkeypatch.setenv("LLM_BACKEND", "github")
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-gh-token")
+    monkeypatch.delenv("GITHUB_MODELS_MODEL", raising=False)
+
+    calls = []
+    original_AsyncOpenAI = _openai_stub.AsyncOpenAI
+    original_AsyncAzureOpenAI = _openai_stub.AsyncAzureOpenAI
+
+    class _TrackingOpenAI(MagicMock):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            calls.append(("AsyncOpenAI", kwargs))
+
+    class _TrackingAzureOpenAI(MagicMock):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            calls.append(("AsyncAzureOpenAI", kwargs))
+
+    _openai_stub.AsyncOpenAI = _TrackingOpenAI
+    _openai_stub.AsyncAzureOpenAI = _TrackingAzureOpenAI
+
+    try:
+        from src.utils.llm_client import LLMClient
+        client = LLMClient()
+
+        assert client._primary_model == "Phi-3.5-mini-instruct"
+        primary_calls = [c for c in calls if c[0] == "AsyncOpenAI"]
+        assert len(primary_calls) >= 1
+        assert primary_calls[0][1].get("base_url") == _GITHUB_MODELS_BASE_URL
+    finally:
+        _openai_stub.AsyncOpenAI = original_AsyncOpenAI
+        _openai_stub.AsyncAzureOpenAI = original_AsyncAzureOpenAI
+
+
+# ---------------------------------------------------------------------------
+# Test: Fallback model defaults to Phi-3.5-mini-instruct
+# ---------------------------------------------------------------------------
+
+def test_fallback_model_default(monkeypatch):
+    """Default _fallback_model is Phi-3.5-mini-instruct (not gpt-4o-mini)."""
+    monkeypatch.setenv("LLM_BACKEND", "foundry")
+    monkeypatch.delenv("GITHUB_FALLBACK_MODEL", raising=False)
+
+    from src.utils.llm_client import LLMClient
+    client = LLMClient()
+
+    assert client._fallback_model == "Phi-3.5-mini-instruct"

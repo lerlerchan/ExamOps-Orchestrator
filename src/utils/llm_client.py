@@ -3,18 +3,22 @@ LLMClient — Unified LLM client with multi-backend primary + GitHub Models fall
 
 Selects the primary backend via the LLM_BACKEND env var:
   "foundry" (default) — Azure AI Foundry → Phi-3.5-mini-instruct
+  "github"            — GitHub Models → Phi-3.5-mini-instruct (requires GITHUB_TOKEN only)
   "ollama"            — Ollama → Phi-4 (fully offline, OpenAI-compatible API)
   "azure"             — Azure OpenAI → GPT-4o-mini (legacy)
 
 GitHub Models stays as a last-resort 429 fallback for all backends.
 
 Environment variables:
-    LLM_BACKEND                — "foundry" | "ollama" | "azure" (default: foundry)
+    LLM_BACKEND                — "foundry" | "github" | "ollama" | "azure" (default: foundry)
 
     # Foundry backend (default):
     AZURE_FOUNDRY_ENDPOINT     — Azure AI Foundry endpoint
     AZURE_FOUNDRY_KEY          — Azure AI Foundry key
     AZURE_FOUNDRY_DEPLOYMENT   — model deployment name (default: Phi-3.5-mini-instruct)
+
+    # GitHub Models backend:
+    GITHUB_MODELS_MODEL        — model name (default: Phi-3.5-mini-instruct)
 
     # Ollama backend:
     OLLAMA_BASE_URL            — Ollama OpenAI-compat base URL (default: http://localhost:11434/v1)
@@ -29,10 +33,11 @@ Environment variables:
     GITHUB_TOKEN               — GitHub personal access token (fallback on 429)
                                  Grant models:read permission.
                                  https://github.com/settings/tokens
+    GITHUB_FALLBACK_MODEL      — model used for 429 fallback (default: Phi-3.5-mini-instruct)
 
 Rate limits (GitHub Models free tier):
-    GPT-4o-mini : 150 req/day, 15 req/min, 8000 tokens in / 4000 out
-    Phi-4       : 150 req/day, 15 req/min, 8000 tokens in / 4000 out
+    Phi-3.5-mini-instruct : 150 req/day, 15 req/min, 8000 tokens in / 4000 out
+    Phi-4                 : 150 req/day, 15 req/min, 8000 tokens in / 4000 out
 """
 
 import logging
@@ -41,7 +46,6 @@ import os
 logger = logging.getLogger(__name__)
 
 _GITHUB_MODELS_BASE_URL = "https://models.inference.ai.azure.com"
-_GITHUB_FALLBACK_MODEL = "gpt-4o-mini"
 _GITHUB_MAX_TOKENS = 4000  # GitHub Models output cap
 
 
@@ -65,7 +69,16 @@ class LLMClient:
 
         backend = os.getenv("LLM_BACKEND", "foundry").lower()
 
-        if backend == "ollama":
+        if backend == "github":
+            self._primary = AsyncOpenAI(
+                base_url=_GITHUB_MODELS_BASE_URL,
+                api_key=os.getenv("GITHUB_TOKEN", ""),
+            )
+            self._primary_model = os.getenv(
+                "GITHUB_MODELS_MODEL", "Phi-3.5-mini-instruct"
+            )
+
+        elif backend == "ollama":
             self._primary = AsyncOpenAI(
                 base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
                 api_key="ollama",   # SDK requires non-empty; Ollama ignores it
@@ -98,6 +111,9 @@ class LLMClient:
             )
             if gh_token
             else None
+        )
+        self._fallback_model = os.getenv(
+            "GITHUB_FALLBACK_MODEL", "Phi-3.5-mini-instruct"
         )
 
     async def chat(
@@ -192,7 +208,7 @@ class LLMClient:
     async def _github_chat(self, messages, temperature, max_tokens) -> str:
         capped = min(max_tokens, _GITHUB_MAX_TOKENS)
         response = await self._fallback.chat.completions.create(
-            model=_GITHUB_FALLBACK_MODEL,
+            model=self._fallback_model,
             messages=messages,
             temperature=temperature,
             max_tokens=capped,
@@ -202,7 +218,7 @@ class LLMClient:
     async def _github_stream(self, messages, temperature, max_tokens):
         capped = min(max_tokens, _GITHUB_MAX_TOKENS)
         stream = await self._fallback.chat.completions.create(
-            model=_GITHUB_FALLBACK_MODEL,
+            model=self._fallback_model,
             messages=messages,
             temperature=temperature,
             max_tokens=capped,
