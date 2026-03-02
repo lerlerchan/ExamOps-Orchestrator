@@ -11,7 +11,7 @@ module.exports = defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
 
   use: {
-    baseURL: 'http://localhost:8765',
+    baseURL: process.env.E2E_BASE_URL || 'https://func-examops-prod.azurewebsites.net/api/web',
     headless: true,
     viewport: { width: 1440, height: 900 },
     actionTimeout: 8_000,
@@ -25,12 +25,4 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-
-  // Serve the frontend/ directory with Python's built-in http.server
-  webServer: {
-    command: 'python -m http.server 8765 --directory frontend',
-    port: 8765,
-    reuseExistingServer: !process.env.CI,
-    timeout: 10_000,
-  },
 });

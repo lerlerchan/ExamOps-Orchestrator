@@ -5,7 +5,7 @@ Thanks for your interest in contributing to ExamOps Orchestrator. Please follow 
 **Primary maintainers / contributors**
 
 - @[lerlerchan](https://github.com/lerlerchan)
-- @[CalvinTeo]https://github.com/calvin139
+- @[calvin139]https://github.com/calvin139
 - @[qqrey](https://github.com/qqrey6)
 - @[Ching](https://github.com/Ching040917)
 

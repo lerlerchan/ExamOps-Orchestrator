@@ -247,7 +247,6 @@ class LLMValidator:
 
     def __init__(self) -> None:
         self._endpoint = os.getenv("AZURE_FOUNDRY_ENDPOINT")
-        self._api_key = os.getenv("AZURE_FOUNDRY_KEY")
         try:
             from src.utils.llm_client import LLMClient
             self._llm = LLMClient()

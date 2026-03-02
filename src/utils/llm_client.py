@@ -83,7 +83,7 @@ class LLMClient:
 
         try:
             return await self._azure_chat(messages, temperature, max_tokens)
-        except RateLimitError as exc:
+        except RateLimitError:
             if self._fallback is None:
                 logger.error(
                     "Azure OpenAI 429 and no GITHUB_TOKEN fallback configured"

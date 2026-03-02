@@ -14,27 +14,26 @@ Environment variables required:
 import io
 import json
 import logging
-import os
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
-_EXTRACT_PROMPT = """You are an academic curriculum analyst. Extract ALL Course Learning Outcomes (CLOs) and Programme Learning Outcomes (PLOs) from the provided syllabus text.
-
-Return a JSON object with exactly these keys:
-{
-  "clo_list": ["CLO1: ...", "CLO2: ...", ...],
-  "plo_list": ["PLO1: ...", "PLO2: ...", ...]
-}
-
-Rules:
-- Include the full text of each CLO and PLO.
-- If no PLOs are found, return an empty list for plo_list.
-- Do not include duplicates.
-- Output ONLY the JSON object, no other text.
-
-Syllabus text:
-"""
+_EXTRACT_PROMPT = (
+    "You are an academic curriculum analyst. Extract ALL Course Learning Outcomes"
+    " (CLOs) and Programme Learning Outcomes (PLOs)"
+    " from the provided syllabus text.\n\n"
+    'Return a JSON object with exactly these keys:\n'
+    '{\n'
+    '  "clo_list": ["CLO1: ...", "CLO2: ...", ...],\n'
+    '  "plo_list": ["PLO1: ...", "PLO2: ...", ...]\n'
+    '}\n\n'
+    "Rules:\n"
+    "- Include the full text of each CLO and PLO.\n"
+    "- If no PLOs are found, return an empty list for plo_list.\n"
+    "- Do not include duplicates.\n"
+    "- Output ONLY the JSON object, no other text.\n\n"
+    "Syllabus text:\n"
+)
 
 
 def _extract_text_from_docx(data: bytes) -> str:

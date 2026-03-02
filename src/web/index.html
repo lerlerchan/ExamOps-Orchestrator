@@ -766,8 +766,10 @@
 </div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
+// ══ Constants & API ════════════════════════════════════════════════════════
 const API_BASE = '';  // same origin via Azure Functions proxy
+
+// ── State ──────────────────────────────────────────────────────────────────
 let sessionId = localStorage.getItem('examops_session_id') || null;
 let currentStep = 1;
 let completedSteps = new Set();
@@ -1282,7 +1284,7 @@ function renderFormatResult(data) {
   document.getElementById('formatResult').style.display = '';
 }
 
-// ── Utility ────────────────────────────────────────────────────────────────
+// ══ Utilities ══════════════════════════════════════════════════════════════
 function escHtml(str) {
   return String(str || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')

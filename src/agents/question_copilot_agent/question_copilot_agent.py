@@ -26,17 +26,21 @@ logger = logging.getLogger(__name__)
 EMBEDDING_MODEL = os.getenv("AZURE_EMBEDDING_MODEL", "text-embedding-ada-002")
 MATERIALS_INDEX = os.getenv("SEARCH_MATERIALS_INDEX", "exam-materials")
 
-_SYSTEM_PROMPT = """You are an AI exam question generation assistant for Southern University College.
-Your role is to help lecturers create high-quality exam questions aligned to Course Learning Outcomes (CLOs).
-
-When generating questions:
-1. Base questions on the provided learning materials context.
-2. Suggest which CLO each question maps to.
-3. Suggest appropriate marks (typically 3, 5, or 10 marks).
-4. End EVERY response with a JSON block (surrounded by ```json ... ```) containing:
-   {"suggested_clo": "CLO1", "suggested_marks": 5, "question_text": "...the full question..."}
-
-Keep responses focused and academic in tone."""
+_SYSTEM_PROMPT = (
+    "You are an AI exam question generation assistant"
+    " for Southern University College.\n"
+    "Your role is to help lecturers create high-quality exam questions"
+    " aligned to Course Learning Outcomes (CLOs).\n\n"
+    "When generating questions:\n"
+    "1. Base questions on the provided learning materials context.\n"
+    "2. Suggest which CLO each question maps to.\n"
+    "3. Suggest appropriate marks (typically 3, 5, or 10 marks).\n"
+    "4. End EVERY response with a JSON block"
+    " (surrounded by ```json ... ```) containing:\n"
+    '   {"suggested_clo": "CLO1", "suggested_marks": 5,'
+    ' "question_text": "...the full question..."}\n\n'
+    "Keep responses focused and academic in tone."
+)
 
 _RAG_PROMPT_TEMPLATE = """Learning materials context:
 {context}
@@ -55,7 +59,8 @@ class QuestionCopilotAgent:
 
     Usage:
         agent = QuestionCopilotAgent()
-        async for token in agent.stream(session_id, "Generate a question on...", clo_list):
+        async for token in agent.stream(session_id, "Generate a question on...",
+                                        clo_list):
             yield f"data: {token}\\n\\n"
     """
 

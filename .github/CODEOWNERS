@@ -2,29 +2,35 @@
 
 # Agents
 src/agents/coordinator_agent/ @lerlerchan
-src/agents/formatting_engine/ @lerlerchan @bob
-src/agents/file_handler_agent/ @bob
-src/agents/question_copilot_agent/ @alice
-src/agents/syllabus_agent/ @alice
-src/agents/diff_generator/ @bob
+src/agents/formatting_engine/ @lerlerchan 
+src/agents/file_handler_agent/ @lerlerchan 
+src/agents/question_copilot_agent/ @lerlerchan 
+src/agents/syllabus_agent/ @lerlerchan 
+src/agents/diff_generator/ @lerlerchan 
 
 # Functions (Azure Functions handlers)
-src/functions/ @carol @bob
+src/functions/ @Copilot
 
 # MCP server and tooling
-src/mcp/ @carol
+src/mcp/ @lerlerchan
 
 # Session, utils, and core libraries
 src/session/ @lerlerchan
 src/utils/ @alice
 
 # Tests and CI
-tests/ @alice @bob
-.github/workflows/ @lerlerchan @carol
+tests/ @copilot @Calvin139
+.github/workflows/ @lerlerchan @qqrey @Copilot
 
 # Docs and tasks
 tasks/ @lerlerchan
 CLAUDE.md @lerlerchan
 
 # Fallback owners for everything else
-* @lerlerchan @alice @bob @carol
+* @lerlerchan @Ching040917 @qqrey6 @Calvin139
+
+# Diagram
+@Ching040917 @qqrey6 @Calvin139
+
+# VideoScripting
+@Copilot
