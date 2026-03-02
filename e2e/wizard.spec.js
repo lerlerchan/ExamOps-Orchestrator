@@ -14,6 +14,25 @@ const WIZARD_URL =
   process.env.E2E_BASE_URL ||
   'https://func-examops-prod.azurewebsites.net/api/web';
 
+/** Attach a minimal fake .docx to #fileInput1 so the submit button activates. */
+async function attachFakeDocx(page) {
+  await page.locator('#fileInput1').setInputFiles({
+    name: 'test.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    buffer: Buffer.from('PK stub'),
+  });
+}
+
+/** Unlock steps 1 & 2 and navigate to Step 3. */
+async function gotoStep3(page) {
+  await page.goto(WIZARD_URL);
+  await page.evaluate(() => {
+    window.unlockStep(1);
+    window.unlockStep(2);
+    window.goToStep(3);
+  });
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. PAGE LOAD
 // ══════════════════════════════════════════════════════════════════════════════
@@ -73,12 +92,7 @@ test.describe('Step 1 — Upload Syllabus', () => {
     });
 
     // Need a file selected before the button does anything
-    const fileInput = page.locator('#fileInput1');
-    await fileInput.setInputFiles({
-      name: 'test.docx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      buffer: Buffer.from('PK stub'),
-    });
+    await attachFakeDocx(page);
 
     const btn = page.locator('button', { hasText: /Extract CLOs/i });
     await btn.click();
@@ -95,12 +109,7 @@ test.describe('Step 1 — Upload Syllabus', () => {
     // Abort the upload so the catch block fires
     await page.route('**/api/upload-syllabus', route => route.abort());
 
-    const fileInput = page.locator('#fileInput1');
-    await fileInput.setInputFiles({
-      name: 'test.docx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      buffer: Buffer.from('PK stub'),
-    });
+    await attachFakeDocx(page);
 
     const btn = page.locator('button', { hasText: /Extract CLOs/i });
     await btn.click();
@@ -147,28 +156,18 @@ test.describe('Step navigation', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 test.describe('Step 3 — Chat UI', () => {
-  async function navigateToStep3(page) {
-    await page.goto(WIZARD_URL);
-    // Unlock and navigate to step 3 programmatically
-    await page.evaluate(() => {
-      window.unlockStep(1);
-      window.unlockStep(2);
-      window.goToStep(3);
-    });
-  }
-
   test('chat input textarea is present', async ({ page }) => {
-    await navigateToStep3(page);
+    await gotoStep3(page);
     await expect(page.locator('#chatInput')).toBeVisible();
   });
 
   test('Send button is present', async ({ page }) => {
-    await navigateToStep3(page);
+    await gotoStep3(page);
     await expect(page.locator('#chatSendBtn')).toBeVisible();
   });
 
   test('pressing Enter in textarea triggers send', async ({ page }) => {
-    await navigateToStep3(page);
+    await gotoStep3(page);
 
     // Mock the chat endpoint so the send doesn't actually hit the network
     await page.route('**/api/chat', route => route.abort());
@@ -224,12 +223,7 @@ test.describe('Error handling', () => {
     await page.goto(WIZARD_URL);
     await page.route('**/api/upload-syllabus', route => route.abort());
 
-    const fileInput = page.locator('#fileInput1');
-    await fileInput.setInputFiles({
-      name: 'test.docx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      buffer: Buffer.from('PK stub'),
-    });
+    await attachFakeDocx(page);
 
     await page.locator('button', { hasText: /Extract CLOs/i }).click();
     await expect(page.locator('#alert1')).toContainText('❌', { timeout: 8_000 });
@@ -239,12 +233,7 @@ test.describe('Error handling', () => {
     await page.goto(WIZARD_URL);
     await page.route('**/api/upload-syllabus', route => route.abort());
 
-    const fileInput = page.locator('#fileInput1');
-    await fileInput.setInputFiles({
-      name: 'test.docx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      buffer: Buffer.from('PK stub'),
-    });
+    await attachFakeDocx(page);
 
     const btn = page.locator('button', { hasText: /Extract CLOs/i });
     await btn.click();

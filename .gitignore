@@ -1,5 +1,7 @@
 .env
 *.zip
 deploy*.zip
+test-results/
+playwright-report/
 __pycache__/
 *.pyc

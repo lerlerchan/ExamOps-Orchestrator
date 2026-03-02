@@ -1,16 +1,34 @@
 """
-LLMClient — Unified LLM client with Azure OpenAI primary + GitHub Models fallback.
+LLMClient — Unified LLM client with multi-backend primary + GitHub Models fallback.
 
-Both are Microsoft ecosystem (GitHub is owned by Microsoft).
-Uses the same OpenAI SDK — no extra dependencies beyond what's already installed.
+Selects the primary backend via the LLM_BACKEND env var:
+  "foundry" (default) — Azure AI Foundry → Phi-3.5-mini-instruct
+  "ollama"            — Ollama → Phi-4 (fully offline, OpenAI-compatible API)
+  "azure"             — Azure OpenAI → GPT-4o-mini (legacy)
+
+GitHub Models stays as a last-resort 429 fallback for all backends.
 
 Environment variables:
-    AZURE_OPENAI_ENDPOINT    — Azure OpenAI endpoint (primary)
-    AZURE_OPENAI_KEY         — Azure OpenAI key (primary)
-    AZURE_OPENAI_DEPLOYMENT  — deployment name (default: gpt-4o-mini)
-    GITHUB_TOKEN             — GitHub personal access token (fallback)
-                               Grant models:read permission.
-                               https://github.com/settings/tokens
+    LLM_BACKEND                — "foundry" | "ollama" | "azure" (default: foundry)
+
+    # Foundry backend (default):
+    AZURE_FOUNDRY_ENDPOINT     — Azure AI Foundry endpoint
+    AZURE_FOUNDRY_KEY          — Azure AI Foundry key
+    AZURE_FOUNDRY_DEPLOYMENT   — model deployment name (default: Phi-3.5-mini-instruct)
+
+    # Ollama backend:
+    OLLAMA_BASE_URL            — Ollama OpenAI-compat base URL (default: http://localhost:11434/v1)
+    OLLAMA_MODEL               — Ollama model tag (default: phi4)
+
+    # Azure backend (legacy):
+    AZURE_OPENAI_ENDPOINT      — Azure OpenAI endpoint
+    AZURE_OPENAI_KEY           — Azure OpenAI key
+    AZURE_OPENAI_DEPLOYMENT    — deployment name (default: gpt-4o-mini)
+
+    # Fallback (all backends):
+    GITHUB_TOKEN               — GitHub personal access token (fallback on 429)
+                                 Grant models:read permission.
+                                 https://github.com/settings/tokens
 
 Rate limits (GitHub Models free tier):
     GPT-4o-mini : 150 req/day, 15 req/min, 8000 tokens in / 4000 out
@@ -29,7 +47,7 @@ _GITHUB_MAX_TOKENS = 4000  # GitHub Models output cap
 
 class LLMClient:
     """
-    Unified LLM client: Azure OpenAI primary → GitHub Models fallback.
+    Unified LLM client: configurable primary backend → GitHub Models fallback.
 
     Usage (non-streaming)::
 
@@ -45,13 +63,32 @@ class LLMClient:
     def __init__(self) -> None:
         from openai import AsyncAzureOpenAI, AsyncOpenAI
 
-        self._primary_model = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
+        backend = os.getenv("LLM_BACKEND", "foundry").lower()
 
-        self._primary = AsyncAzureOpenAI(
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-            api_key=os.getenv("AZURE_OPENAI_KEY", ""),
-            api_version="2024-02-01",
-        )
+        if backend == "ollama":
+            self._primary = AsyncOpenAI(
+                base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+                api_key="ollama",   # SDK requires non-empty; Ollama ignores it
+            )
+            self._primary_model = os.getenv("OLLAMA_MODEL", "phi4")
+
+        elif backend == "foundry":
+            self._primary = AsyncAzureOpenAI(
+                azure_endpoint=os.getenv("AZURE_FOUNDRY_ENDPOINT", ""),
+                api_key=os.getenv("AZURE_FOUNDRY_KEY", ""),
+                api_version="2024-02-01",
+            )
+            self._primary_model = os.getenv(
+                "AZURE_FOUNDRY_DEPLOYMENT", "Phi-3.5-mini-instruct"
+            )
+
+        else:  # "azure" — original behaviour
+            self._primary = AsyncAzureOpenAI(
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
+                api_key=os.getenv("AZURE_OPENAI_KEY", ""),
+                api_version="2024-02-01",
+            )
+            self._primary_model = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
 
         gh_token = os.getenv("GITHUB_TOKEN")
         self._fallback = (
@@ -70,27 +107,27 @@ class LLMClient:
         max_tokens: int = 2000,
     ) -> str:
         """
-        Non-streaming completion. Tries Azure OpenAI first, falls back to
+        Non-streaming completion. Tries the primary backend first, falls back to
         GitHub Models on 429 RateLimitError.
 
         Returns:
             Assistant message content string.
 
         Raises:
-            openai.RateLimitError: if both Azure and GitHub Models are unavailable.
+            openai.RateLimitError: if both primary and GitHub Models are unavailable.
         """
         from openai import RateLimitError
 
         try:
-            return await self._azure_chat(messages, temperature, max_tokens)
+            return await self._primary_chat(messages, temperature, max_tokens)
         except RateLimitError:
             if self._fallback is None:
                 logger.error(
-                    "Azure OpenAI 429 and no GITHUB_TOKEN fallback configured"
+                    "Primary LLM 429 and no GITHUB_TOKEN fallback configured"
                 )
                 raise
             logger.warning(
-                "Azure OpenAI rate limited (429) → falling back to GitHub Models"
+                "Primary LLM rate limited (429) → falling back to GitHub Models"
             )
             return await self._github_chat(messages, temperature, max_tokens)
 
@@ -112,24 +149,24 @@ class LLMClient:
         from openai import RateLimitError
 
         try:
-            async for token in self._azure_stream(messages, temperature, max_tokens):
+            async for token in self._primary_stream(messages, temperature, max_tokens):
                 yield token
         except RateLimitError:
             if self._fallback is None:
                 logger.error(
-                    "Azure OpenAI 429 and no GITHUB_TOKEN fallback configured"
+                    "Primary LLM 429 and no GITHUB_TOKEN fallback configured"
                 )
                 raise
             logger.warning(
-                "Azure OpenAI rate limited (429) during streaming → "
+                "Primary LLM rate limited (429) during streaming → "
                 "falling back to GitHub Models"
             )
             async for token in self._github_stream(messages, temperature, max_tokens):
                 yield token
 
-    # ── Azure OpenAI ──────────────────────────────────────────────────────────
+    # ── Primary backend ───────────────────────────────────────────────────────
 
-    async def _azure_chat(self, messages, temperature, max_tokens) -> str:
+    async def _primary_chat(self, messages, temperature, max_tokens) -> str:
         response = await self._primary.chat.completions.create(
             model=self._primary_model,
             messages=messages,
@@ -138,7 +175,7 @@ class LLMClient:
         )
         return response.choices[0].message.content
 
-    async def _azure_stream(self, messages, temperature, max_tokens):
+    async def _primary_stream(self, messages, temperature, max_tokens):
         stream = await self._primary.chat.completions.create(
             model=self._primary_model,
             messages=messages,
