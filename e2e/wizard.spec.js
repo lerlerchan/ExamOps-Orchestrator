@@ -8,28 +8,34 @@
 
 const { test, expect } = require('@playwright/test');
 
+// Full URL of the wizard page. page.goto('/') resolves to the domain root on
+// Azure Functions (not /api/web), so we navigate using the absolute URL directly.
+const WIZARD_URL =
+  process.env.E2E_BASE_URL ||
+  'https://func-examops-prod.azurewebsites.net/api/web';
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. PAGE LOAD
 // ══════════════════════════════════════════════════════════════════════════════
 
 test.describe('Page load', () => {
   test('has correct page title', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     await expect(page).toHaveTitle(/ExamOps/i);
   });
 
   test('shows SUC header with "ExamOps Orchestrator"', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     await expect(page.locator('.suc-header')).toContainText('ExamOps Orchestrator');
   });
 
   test('shows 5 steps in left navigation panel', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     await expect(page.locator('.step-item')).toHaveCount(5);
   });
 
   test('Step 1 is active by default', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     const activeStep = page.locator('.step-item.active');
     await expect(activeStep).toHaveCount(1);
     await expect(activeStep).toContainText('Upload Syllabus');
@@ -42,24 +48,24 @@ test.describe('Page load', () => {
 
 test.describe('Step 1 — Upload Syllabus', () => {
   test('upload area is visible', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     await expect(page.locator('#uploadArea1')).toBeVisible();
   });
 
   test('SharePoint URL input is visible', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     await expect(page.locator('#spUrl1')).toBeVisible();
   });
 
   test('"Extract CLOs & PLOs" button is visible and enabled', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     const btn = page.locator('button', { hasText: /Extract CLOs/i });
     await expect(btn).toBeVisible();
     await expect(btn).toBeEnabled();
   });
 
   test('button disables on click and shows spinner text', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
 
     // Intercept the API call so it hangs — button should disable while pending
     await page.route('**/api/upload-syllabus', route => {
@@ -84,7 +90,7 @@ test.describe('Step 1 — Upload Syllabus', () => {
   });
 
   test('network error shows "❌" message, not infinite spinner', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
 
     // Abort the upload so the catch block fires
     await page.route('**/api/upload-syllabus', route => route.abort());
@@ -109,7 +115,7 @@ test.describe('Step 1 — Upload Syllabus', () => {
 
 test.describe('Step navigation', () => {
   test('step labels match expected values', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     const labels = page.locator('.step-label');
     await expect(labels.nth(0)).toContainText('Upload Syllabus');
     await expect(labels.nth(1)).toContainText('Upload Materials');
@@ -119,13 +125,13 @@ test.describe('Step navigation', () => {
   });
 
   test('steps 2–5 are locked on initial load', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     const lockedSteps = page.locator('.step-item.locked');
     await expect(lockedSteps).toHaveCount(4);
   });
 
   test('after unlockStep(1) step 2 becomes clickable', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
 
     // Programmatically unlock step 1 (simulates completing Step 1)
     await page.evaluate(() => window.unlockStep(1));
@@ -142,7 +148,7 @@ test.describe('Step navigation', () => {
 
 test.describe('Step 3 — Chat UI', () => {
   async function navigateToStep3(page) {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     // Unlock and navigate to step 3 programmatically
     await page.evaluate(() => {
       window.unlockStep(1);
@@ -184,7 +190,7 @@ test.describe('Step 3 — Chat UI', () => {
 
 test.describe('Session management', () => {
   test('sessionId is stored in localStorage after page load', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     const sessionId = await page.evaluate(() => localStorage.getItem('examops_session_id'));
     // May be null on first load (only set after first API call), or a UUID if previously set
     // Either null or a string is acceptable
@@ -192,7 +198,7 @@ test.describe('Session management', () => {
   });
 
   test('sessionId is a valid UUID format if set', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
 
     // Inject a UUID into localStorage and reload to simulate an existing session
     await page.evaluate(() => {
@@ -215,7 +221,7 @@ test.describe('Session management', () => {
 
 test.describe('Error handling', () => {
   test('network error shows ❌ error message', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     await page.route('**/api/upload-syllabus', route => route.abort());
 
     const fileInput = page.locator('#fileInput1');
@@ -230,7 +236,7 @@ test.describe('Error handling', () => {
   });
 
   test('button re-enables after error', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(WIZARD_URL);
     await page.route('**/api/upload-syllabus', route => route.abort());
 
     const fileInput = page.locator('#fileInput1');
