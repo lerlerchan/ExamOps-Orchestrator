@@ -60,9 +60,12 @@ jobs:
       - name: Stage function directories at deployment root
         run: |
           # Azure Functions v1 Python model discovers function dirs at the root of the app.
-          # Our functions live under src/functions/ — copy them to root before zipping.
-          cp -r src/functions/format_exam ./format_exam
-          cp -r src/functions/serve_web  ./serve_web
+          # Our functions live under src/functions/ — copy them all to root before zipping.
+          for func_dir in src/functions/*/; do
+            func_name=$(basename "$func_dir")
+            cp -r "$func_dir" "./$func_name"
+            echo "Staged: $func_name"
+          done
           # Also stage web assets at root so serve_web/__init__.py can find index.html
           # via both _HTML_PATH (src/web/index.html) and _ALT_HTML_PATH (web/index.html)
           cp -r src/web ./web
@@ -96,26 +99,29 @@ jobs:
             --build-remote false \
             --timeout 300
 
-      - name: Smoke test deployed function
+      - name: Smoke test deployed functions
         run: |
           sleep 30
           BASE="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net"
 
-          # /api/format-exam — anonymous POST, expect 400 (missing fields)
-          FMT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/format-exam")
-          echo "format-exam smoke test HTTP status: $FMT_STATUS"
-          if [ "$FMT_STATUS" != "400" ] && [ "$FMT_STATUS" != "200" ]; then
-            echo "Unexpected format-exam status $FMT_STATUS — deployment may have failed"
-            exit 1
-          fi
+          check() {
+            local url="$1" method="$2" expect="$3"
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X "$method" "$url")
+            if echo "$expect" | grep -q "$STATUS"; then
+              echo "✅ $method $url → $STATUS"
+            else
+              echo "❌ $method $url → $STATUS (expected one of: $expect)"
+              exit 1
+            fi
+          }
 
-          # /api/web — anonymous GET, expect 200 (HTML page)
-          WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/web")
-          echo "web smoke test HTTP status: $WEB_STATUS"
-          if [ "$WEB_STATUS" != "200" ]; then
-            echo "Unexpected web status $WEB_STATUS — frontend not deployed"
-            exit 1
-          fi
+          check "$BASE/api/web"                 GET  "200"
+          check "$BASE/api/format-exam"         POST "400"
+          check "$BASE/api/upload-syllabus"     POST "400"
+          check "$BASE/api/upload-materials"    POST "400"
+          check "$BASE/api/chat"                POST "400"
+          check "$BASE/api/fill-moderation-form" POST "400"
+          check "$BASE/api/export-questions"    POST "400"
 
           echo "All smoke tests passed."
 
