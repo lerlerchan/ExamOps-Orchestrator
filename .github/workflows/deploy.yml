@@ -101,7 +101,7 @@ jobs:
 
       - name: Smoke test deployed functions
         run: |
-          sleep 30
+          sleep 60
           BASE="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net"
 
           check() {
