@@ -69,6 +69,8 @@ jobs:
           # Also stage web assets at root so serve_web/__init__.py can find index.html
           # via both _HTML_PATH (src/web/index.html) and _ALT_HTML_PATH (web/index.html)
           cp -r src/web ./web
+          # Stage host.json at deployment root (Azure Functions requires it at wwwroot root)
+          cp src/functions/host.json ./host.json
 
       - name: Create deployment zip
         run: |
