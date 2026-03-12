@@ -31,7 +31,7 @@ FormattingEngineAgent.process_and_validate(original, template_rules)
 
 | Rule | Input example | Output example |
 |------|--------------|----------------|
-| Header/footer injection | *(missing)* | `SOUTHERN UNIVERSITY COLLEGE` |
+| Header/footer injection | *(missing)* | `SUC` |
 | Page margins | Any | top/bottom 2.5 cm, left 3.0 cm, right 2.5 cm |
 | Numbering — Q-level | `Q1)` | `Q1.` |
 | Numbering — sub-level | `1a)` | `(a)` |
@@ -55,7 +55,7 @@ Math expressions are identified at the run level using `qn("m:oMath")`. This ens
 ## Layer 2 — LLM Prompt Structure
 
 **System prompt** (fixed):
-> "You are an exam paper compliance checker for Southern University College. Evaluate the formatted document against the template rules and return a JSON object with the following keys: compliance_score (0-100), category_scores (dict), issues_found (list of str), edge_cases (list of str), math_expressions_preserved (bool), summary (str). Respond with JSON only — no markdown fences."
+> "You are an exam paper compliance checker for SUC. Evaluate the formatted document against the template rules and return a JSON object with the following keys: compliance_score (0-100), category_scores (dict), issues_found (list of str), edge_cases (list of str), math_expressions_preserved (bool), summary (str). Respond with JSON only — no markdown fences."
 
 **User prompt** (runtime):
 ```

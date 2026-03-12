@@ -153,7 +153,7 @@ class FileHandlerAgent:
         Returns:
             Template rules dict, e.g.:
             {
-                "header_text": "SOUTHERN UNIVERSITY COLLEGE",
+                "header_text": "SUC",
                 "numbering_scheme": ["Q{n}.", "(a)", "(i)"],
                 "marks_pattern": "(\\d+ marks?)",
                 "margin_cm": {"top": 2.5, "bottom": 2.5, "left": 3.0, "right": 2.5},

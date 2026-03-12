@@ -42,7 +42,7 @@ def empty_doc():
 def mock_template_rules():
     """Minimal template rules dict matching Azure AI Search output schema."""
     return {
-        "header_text": "SOUTHERN UNIVERSITY COLLEGE",
+        "header_text": "SUC",
         "footer_text": "Page",
         "margin_cm": {"top": 2.5, "bottom": 2.5, "left": 3.0, "right": 2.5},
         "numbering_style": "Q1. / (a) / (i)",

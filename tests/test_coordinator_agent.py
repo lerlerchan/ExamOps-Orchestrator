@@ -27,7 +27,7 @@ def _make_mock_doc() -> Document:
 
 
 MOCK_TEMPLATE_RULES = {
-    "header_text": "SOUTHERN UNIVERSITY COLLEGE",
+    "header_text": "SUC",
     "margin_cm": {"top": 2.5, "bottom": 2.5, "left": 3.0, "right": 2.5},
 }
 

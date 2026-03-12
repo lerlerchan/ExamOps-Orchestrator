@@ -66,7 +66,7 @@ class FileHandlerPlugin:
             return f"ERROR: No job context found for job_id={job_id}"
         try:
             ctx.template_rules = await self._agent.get_template_from_vectordb(
-                "Southern University College exam paper formatting rules"
+                "SUC exam paper formatting rules"
             )
             logger.info("[SK] get_template completed for job %s", job_id)
             return f"Template rules retrieved for job {job_id}."

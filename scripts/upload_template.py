@@ -99,7 +99,7 @@ def _detect_header(doc: Document) -> str:
         t = p.text.strip()
         if t and len(t) < 80 and t == t.upper():
             return t
-    return "SOUTHERN UNIVERSITY COLLEGE"
+    return "SUC"
 
 
 def extract_template_rules(doc: Document, title: str) -> dict:

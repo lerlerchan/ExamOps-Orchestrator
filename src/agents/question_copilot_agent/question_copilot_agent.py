@@ -28,7 +28,7 @@ MATERIALS_INDEX = os.getenv("SEARCH_MATERIALS_INDEX", "exam-materials")
 
 _SYSTEM_PROMPT = (
     "You are an AI exam question generation assistant"
-    " for Southern University College.\n"
+    " for SUC.\n"
     "Your role is to help lecturers create high-quality exam questions"
     " aligned to Course Learning Outcomes (CLOs).\n\n"
     "When generating questions:\n"

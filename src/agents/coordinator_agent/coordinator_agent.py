@@ -292,7 +292,7 @@ class CoordinatorAgent:
         job.update_status("retrieving_template")
         try:
             template_rules = await self.file_handler.get_template_from_vectordb(
-                query="Southern University College exam paper formatting rules"
+                query="SUC exam paper formatting rules"
             )
         except Exception as exc:
             logger.error("Job %s: template retrieval failed — %s", job_id, exc)
