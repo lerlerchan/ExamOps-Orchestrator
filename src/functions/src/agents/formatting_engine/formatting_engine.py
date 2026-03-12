@@ -91,7 +91,7 @@ class RuleBasedFormatter:
         """Inject or overwrite the first-section header and footer text."""
         section = doc.sections[0]
         header_text = template_rules.get(
-            "header_text", "SUC"
+            "header_text", "SOUTHERN UNIVERSITY COLLEGE"
         )
         footer_text = template_rules.get("footer_text", "")
 
@@ -342,7 +342,7 @@ class LLMValidator:
     """
 
     SYSTEM_PROMPT = (
-        "You are an exam paper compliance checker for SUC. "
+        "You are an exam paper compliance checker for Southern University College. "
         "Evaluate the formatted document against the template rules and return a "
         "JSON object with the following keys: compliance_score (0-100), "
         "category_scores (dict), issues_found (list of str), "

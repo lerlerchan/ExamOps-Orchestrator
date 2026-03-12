@@ -318,7 +318,7 @@ class CoordinatorAgent:
                 template_rules = extract_template_rules_from_docx(template_doc)
             else:
                 template_rules = await self.file_handler.get_template_from_vectordb(
-                    query="SUC exam paper formatting rules"
+                    query="Southern University College exam paper formatting rules"
                 )
         except Exception as exc:
             logger.warning(

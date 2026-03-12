@@ -68,6 +68,15 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
             headers=_CORS_HEADERS,
         )
 
+    # ── Save questions from body if provided ───────────────────────────────
+    questions_from_body = body.get("questions")
+    if questions_from_body and isinstance(questions_from_body, list):
+        session.questions = questions_from_body
+        try:
+            store.update_session(session)
+        except Exception as exc:
+            logger.warning("Could not persist questions to session: %s", exc)
+
     # ── Build .docx ────────────────────────────────────────────────────────
     try:
         doc = _build_questions_doc(session)
@@ -117,7 +126,11 @@ def _build_questions_doc(session):
 
     for i, q in enumerate(questions, 1):
         doc.add_heading(f"Q{i}.", level=2)
-        doc.add_paragraph(q.get("text", "(no text)"))
+        # Split on newlines so sub-parts each get their own paragraph
+        raw_text = q.get("text", "(no text)")
+        lines = [ln for ln in raw_text.split("\n") if ln.strip()]
+        for line in (lines if lines else [raw_text]):
+            doc.add_paragraph(line)
         meta_parts = []
         if q.get("clo"):
             meta_parts.append(f"CLO: {q['clo']}")
@@ -150,16 +163,17 @@ async def _upload_doc(session_id: str, doc) -> str:
 
     service_client = BlobServiceClient.from_connection_string(connection_string)
     container_client = service_client.get_container_client(CONTAINER_OUTPUT)
+    from azure.storage.blob import ContentSettings as _CS
     container_client.upload_blob(
         blob_name,
         buf.getvalue(),
         overwrite=True,
-        content_settings={
-            "content_type": (
+        content_settings=_CS(
+            content_type=(
                 "application/vnd.openxmlformats-officedocument"
                 ".wordprocessingml.document"
             )
-        },
+        ),
     )
 
     sas_token = generate_blob_sas(

@@ -67,8 +67,27 @@ The HTTP trigger will be available at `http://localhost:7071/api/format_exam`.
 ## Deploy to Azure Functions
 
 ```bash
-func azure functionapp publish examops-functions
+cd src/functions
+func azure functionapp publish <your-function-app-name>
 ```
+
+Example: `func azure functionapp publish func-examops-suc`
+
+---
+
+## Open the ExamOps app
+
+After deployment, the **root URL** (e.g. `https://<your-app>.azurewebsites.net/`) shows Azure’s default “Your app is up and running” page.
+
+**Use this URL for the 5-step ExamOps wizard:**
+
+**`https://<your-app>.azurewebsites.net/api/web`**
+
+Example: **https://func-examops-suc.azurewebsites.net/api/web**
+
+Optional: to redirect the root URL `/` to `/api/web`, set these Function App settings: `AzureWebJobsDisableHomepage` = `true`, `AzureWebJobsFeatureFlags` = `EnableProxies`. The repo includes `src/functions/proxies.json` for the redirect.
+
+---
 
 For GitHub-based deployment, `.github/workflows/deploy.yml` runs:
 - `pytest` on every PR/push to `main`
