@@ -321,13 +321,13 @@ class CoordinatorAgent:
                     query="SUC exam paper formatting rules"
                 )
         except Exception as exc:
-            logger.warning(
-                "Job %s: template retrieval failed, using SUC defaults — %s", job_id, exc
-            )
-            template_rules = _DEFAULT_SUC_RULES
+            logger.error("Job %s: template retrieval failed — %s", job_id, exc)
+            job.update_status("failed", error="ERR_TEMPLATE_NOT_FOUND")
+            return self._failure_result(job, "ERR_TEMPLATE_NOT_FOUND", str(exc))
 
         if not template_rules:
-            template_rules = _DEFAULT_SUC_RULES
+            job.update_status("failed", error="ERR_TEMPLATE_NOT_FOUND")
+            return self._failure_result(job, "ERR_TEMPLATE_NOT_FOUND", "no rules returned")
 
         # ── Step 3: Format + validate ───────────────────────────────────────
         job.update_status("formatting")
@@ -419,7 +419,7 @@ class CoordinatorAgent:
             "summary": f"Job failed: {error_code}",
             "summary_stats": {},
             "error_code": error_code,
-            "error": detail,
+            "error": f"{error_code}: {detail}",
         }
 
     def _build_summary(
