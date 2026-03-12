@@ -108,48 +108,6 @@ class FileHandlerAgent:
         logger.info("Uploaded %s to %s", blob_name, CONTAINER_INPUT)
         return blob_url
 
-    async def upload_template_to_blob(
-        self, file_stream: io.BytesIO, filename: str, user_id: str
-    ) -> str:
-        """
-        Upload a template/example .docx file to the examops-templates container.
-
-        Blob naming: ``{timestamp}_{user_id}_{filename}``
-
-        Returns:
-            SAS URL with 1-hour expiry.
-        """
-        from azure.storage.blob import (
-            BlobServiceClient,
-            generate_blob_sas,
-            BlobSasPermissions,
-        )
-
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        blob_name = f"{timestamp}_{user_id}_{filename}"
-
-        service_client = BlobServiceClient.from_connection_string(
-            self._connection_string
-        )
-        container_client = service_client.get_container_client(CONTAINER_TEMPLATES)
-        container_client.upload_blob(blob_name, file_stream, overwrite=True)
-
-        sas_token = generate_blob_sas(
-            account_name=service_client.account_name,
-            container_name=CONTAINER_TEMPLATES,
-            blob_name=blob_name,
-            account_key=service_client.credential.account_key,
-            permission=BlobSasPermissions(read=True),
-            expiry=datetime.now(timezone.utc) + timedelta(hours=1),
-        )
-
-        blob_url = (
-            f"https://{service_client.account_name}.blob.core.windows.net"
-            f"/{CONTAINER_TEMPLATES}/{blob_name}?{sas_token}"
-        )
-        logger.info("Uploaded %s to %s", blob_name, CONTAINER_TEMPLATES)
-        return blob_url
-
     # ── Download ─────────────────────────────────────────────────────────────
 
     async def download_from_blob(self, blob_url: str) -> Document:
@@ -321,30 +279,6 @@ class FileHandlerAgent:
 
         logger.info("Saved outputs for job %s", job_id)
         return {"docx": docx_url, "html": html_url}
-
-    def get_diff_html(self, job_id: str) -> str:
-        """
-        Download the HTML diff report for a job from examops-output.
-
-        Args:
-            job_id: Job identifier (blob name prefix from save_outputs).
-
-        Returns:
-            HTML string of the diff report.
-
-        Raises:
-            Exception: If blob not found or download fails.
-        """
-        from azure.storage.blob import BlobServiceClient
-
-        blob_name = f"{job_id}_diff.html"
-        service_client = BlobServiceClient.from_connection_string(
-            self._connection_string
-        )
-        container_client = service_client.get_container_client(CONTAINER_OUTPUT)
-        blob_client = container_client.get_blob_client(blob_name)
-        stream = blob_client.download_blob()
-        return stream.readall().decode("utf-8")
 
     # ── OneDrive link ────────────────────────────────────────────────────────
 

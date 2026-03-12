@@ -24,6 +24,7 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     # --- Parse request ---
     user_id = req.form.get("user_id") or req.params.get("user_id")
     file_data = req.files.get("file")
+    template_data = req.files.get("template_file")
 
     if not user_id or not file_data:
         return func.HttpResponse(
@@ -61,6 +62,22 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
             filename=filename,
             user_id=user_id,
         )
+        template_url = ""
+        if template_data:
+            tname = template_data.filename or "template.docx"
+            if not tname.lower().endswith(".docx"):
+                return func.HttpResponse(
+                    json.dumps({"error": "Template must be a .docx file."}),
+                    status_code=400,
+                    mimetype="application/json",
+                )
+            tbytes = template_data.read()
+            if tbytes:
+                template_url = await file_handler.upload_template_to_blob(
+                    file_stream=io.BytesIO(tbytes),
+                    filename=tname,
+                    user_id=user_id,
+                )
     except ValueError as exc:
         logger.warning("Upload rejected for job_id=%s: %s", job_id, exc)
         return func.HttpResponse(
@@ -85,6 +102,7 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
             job_id=job_id,
             user_id=user_id,
             file_url=blob_url,
+            template_url=template_url,
         )
     except Exception as exc:
         logger.exception("Pipeline failed for job_id=%s", job_id)
@@ -99,8 +117,11 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         "ERR_CORRUPTED_FILE": 422,
         "ERR_TEMPLATE_NOT_FOUND": 422,
         "ERR_STORAGE": 500,
+        "ERR_FORMATTING": 500,
+        "ERR_LLM": 502,
     }
-    status_code = error_to_status.get(result.get("error"), 200)
+    error_code = result.get("error_code") or result.get("error")
+    status_code = error_to_status.get(error_code, 200)
 
     # Add CORS headers so the web UI (served from the same origin) can call this
     headers = {
