@@ -342,10 +342,9 @@
       font-size: 0.78rem;
     }
 
-    .btn:disabled,
-    a.btn[aria-disabled="true"] {
-      opacity: 0.55;
-      cursor: not-allowed;
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: default;
       transform: none;
     }
 
@@ -1074,8 +1073,8 @@
         <div class="card">
           <div class="card-title">Step 5 — Format Exam Paper</div>
           <div class="card-desc">
-            Upload your exam draft (.docx) and (optionally) an example template (.docx).
-            If you provide a template, ExamOps will format the draft to match its layout (margins, header/footer, base font).
+            Upload your exam draft (.docx) to apply Southern University College formatting rules.
+            The AI validator checks numbering, spacing, marks notation, and indentation.
           </div>
 
           <div class="upload-area" id="uploadArea5" onclick="document.getElementById('fileInput5').click()"
@@ -1088,18 +1087,6 @@
           </div>
           <input type="file" class="upload-file-input" id="fileInput5" accept=".docx"
             onchange="onFileSelect(this,'fileName5')">
-
-          <div class="upload-area" id="uploadArea5b" style="margin-top:12px"
-            onclick="document.getElementById('templateInput5').click()"
-            ondragover="handleDragOver(event,'uploadArea5b')" ondragleave="handleDragLeave(event,'uploadArea5b')"
-            ondrop="handleDrop(event,'templateInput5','uploadArea5b')">
-            <div class="upload-icon">📄</div>
-            <div class="upload-label">Click to upload example template (optional)</div>
-            <div class="upload-sub">Accepts .docx only (your desired format)</div>
-            <div id="templateName5" style="margin-top:8px;font-size:0.8rem;color:#0057b8;font-weight:600"></div>
-          </div>
-          <input type="file" class="upload-file-input" id="templateInput5" accept=".docx"
-            onchange="onFileSelect(this,'templateName5')">
 
           <div id="alert5" class="alert"></div>
 
@@ -1677,7 +1664,6 @@
     async function submitStep5() {
       clearAlert('alert5');
       const fileInput = document.getElementById('fileInput5');
-      const templateInput = document.getElementById('templateInput5');
       if (!fileInput.files.length) {
         showAlert('alert5', '⚠ Please upload a .docx exam draft.', 'error');
         return;
@@ -1688,9 +1674,6 @@
       const form = new FormData();
       form.append('file', fileInput.files[0]);
       form.append('user_id', sessionId || 'anonymous');
-      if (templateInput && templateInput.files && templateInput.files.length) {
-        form.append('template_file', templateInput.files[0]);
-      }
 
       try {
         const res = await fetch(`${API_BASE}/api/format-exam`, {
@@ -1716,59 +1699,25 @@
       badge.className = 'score-badge' + (score >= 85 ? '' : score >= 60 ? ' warn' : ' danger');
       badge.innerHTML = `Compliance Score: <strong>${score != null ? score + '%' : 'N/A'}</strong>`;
 
-      // Prefer summary_stats (from backend), fallback to summary object
-      const stats = data.summary_stats || data.summary || {};
+      const fixes = data.summary || {};
       const fixEl = document.getElementById('fixCounts');
       const parts = [];
-      const n = stats.numbering_fixes;
-      const s = stats.spacing_fixes;
-      const f = stats.mark_formatting_fixes ?? stats.formatting_fixes;
-      if (n) parts.push(`${n} numbering fix(es)`);
-      if (s) parts.push(`${s} spacing fix(es)`);
-      if (f) parts.push(`${f} formatting fix(es)`);
-      fixEl.textContent = parts.length ? parts.join('  ·  ') : 'No issues found';
+      if (fixes.numbering_fixes) parts.push(`${fixes.numbering_fixes} numbering fix(es)`);
+      if (fixes.spacing_fixes) parts.push(`${fixes.spacing_fixes} spacing fix(es)`);
+      if (fixes.formatting_fixes) parts.push(`${fixes.formatting_fixes} formatting fix(es)`);
+      fixEl.textContent = parts.join('  ·  ') || 'No issues found';
 
-      const downloadBtn = document.getElementById('downloadFormattedBtn');
-      const viewDiffBtn = document.getElementById('viewDiffBtn');
-      const diffFrame = document.getElementById('diffFrame');
-
-      // Always show buttons; set href and enable only when URL exists
-      const formattedUrl = data.formatted_url || data.onedrive_link || '';
-      if (formattedUrl) {
-        downloadBtn.href = formattedUrl;
-        downloadBtn.removeAttribute('aria-disabled');
-        downloadBtn.style.pointerEvents = '';
-        downloadBtn.download = 'formatted_exam.docx';
-        downloadBtn.title = 'Download formatted exam (.docx)';
-      } else {
-        downloadBtn.removeAttribute('href');
-        downloadBtn.setAttribute('aria-disabled', 'true');
-        downloadBtn.style.pointerEvents = 'none';
-        downloadBtn.removeAttribute('download');
-        downloadBtn.title = 'Download not available';
+      if (data.formatted_url) {
+        document.getElementById('downloadFormattedBtn').href = data.formatted_url;
+        document.getElementById('downloadFormattedBtn').style.display = '';
       }
-      downloadBtn.style.display = '';
-
-      const diffUrl = data.diff_url || '';
-      if (diffUrl) {
-        viewDiffBtn.href = diffUrl;
-        viewDiffBtn.removeAttribute('aria-disabled');
-        viewDiffBtn.style.pointerEvents = '';
-        viewDiffBtn.title = 'Open diff report in new tab';
-        // Load diff in iframe via same-origin proxy to avoid blob/X-Frame-Options issues
-        const jobId = data.job_id || '';
-        const proxyUrl = jobId ? `${API_BASE}/api/diff-report?job_id=${encodeURIComponent(jobId)}` : diffUrl;
-        diffFrame.src = proxyUrl;
-        diffFrame.style.display = 'block';
-      } else {
-        viewDiffBtn.removeAttribute('href');
-        viewDiffBtn.setAttribute('aria-disabled', 'true');
-        viewDiffBtn.style.pointerEvents = 'none';
-        viewDiffBtn.title = 'Diff report not available';
-        diffFrame.src = '';
-        diffFrame.style.display = 'none';
+      if (data.diff_url) {
+        document.getElementById('viewDiffBtn').href = data.diff_url;
+        document.getElementById('viewDiffBtn').style.display = '';
+        const frame = document.getElementById('diffFrame');
+        frame.src = data.diff_url;
+        frame.style.display = '';
       }
-      viewDiffBtn.style.display = '';
 
       document.getElementById('formatResult').style.display = '';
     }

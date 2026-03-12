@@ -47,6 +47,7 @@ src/
 ├── functions/
 │   ├── format_exam/               # Existing: POST /api/format-exam
 │   ├── serve_web/                 # Existing: GET /api/web
+│   ├── diff_report/               # GET /api/diff-report?job_id=… (Step 5 iframe)
 │   ├── upload_syllabus/           # NEW: POST /api/upload-syllabus
 │   ├── upload_materials/          # NEW: POST /api/upload-materials
 │   ├── chat/                      # NEW: POST /api/chat (SSE streaming)
@@ -85,12 +86,15 @@ pytest tests/test_formatting_engine.py::test_numbering_correction -v
 cd src/functions
 func start
 
-# Deploy to Azure Functions
-func azure functionapp publish examops-functions
+# Deploy to Azure Functions (run from repo root; use your Function App name, e.g. func-examops-suc)
+cd src/functions && func azure functionapp publish func-examops-suc
 
+# After changing backend, API, or frontend: redeploy so the live app gets the updates.
 # Lint
 flake8 src/ tests/
 ```
+
+**Remember:** After changing Azure Functions, agents, or `src/web/index.html`, **redeploy** so the live app gets the updates (`cd src/functions && func azure functionapp publish <your-app-name>`).
 
 ---
 

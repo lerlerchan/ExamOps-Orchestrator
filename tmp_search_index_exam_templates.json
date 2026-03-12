@@ -1,0 +1,21 @@
+{
+  "name": "exam-templates",
+  "fields": [
+    { "name": "id", "type": "Edm.String", "key": true },
+    { "name": "template_rules", "type": "Edm.ComplexType" },
+    {
+      "name": "content_vector",
+      "type": "Collection(Edm.Single)",
+      "dimensions": 1536,
+      "vectorSearchProfile": "default-profile"
+    }
+  ],
+  "vectorSearch": {
+    "profiles": [
+      { "name": "default-profile", "algorithm": "default-hnsw" }
+    ],
+    "algorithms": [
+      { "name": "default-hnsw", "kind": "hnsw" }
+    ]
+  }
+}
