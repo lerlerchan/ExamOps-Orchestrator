@@ -133,6 +133,42 @@ CoordinatorAgent
 
 ---
 
+## Step-by-Step Orchestration Flow
+
+From raw course inputs to a submission-ready exam package in 5 guided steps.
+
+### 1) Upload syllabus
+Drop in the syllabus to anchor CLO/PLO extraction and alignment.
+
+![Step 1 - Upload syllabus](sample/step1.jpeg)
+
+### 2) Upload learning materials
+Add slides, notes, and references to power RAG-backed question quality.
+
+![Step 2 - Upload learning materials](sample/step2.jpeg)
+
+### 3) Generate and refine questions with Copilot
+Copilot drafts exam-ready questions grounded in syllabus outcomes and course content.
+
+![Step 3 - Question copilot](sample/step3.jpeg)
+
+### 4) Complete moderation details
+Fill moderation details and auto-populate required moderation artifacts.
+
+![Step 4 - Moderation form](sample/step4.jpg)
+
+### 5) Produce final exam package
+The formatting engine finalizes the paper and generates clear before/after diff evidence.
+
+![Step 5 - Final exam package](sample/step5.jpg)
+
+### Output preview
+A sample of the polished output produced by the full orchestration pipeline.
+
+![Step output - Formatted result](sample/step4Output.jpg)
+
+---
+
 ## Contributors
 
 - [@lerlerchan](https://github.com/lerlerchan)
