@@ -1,5 +1,15 @@
 # ExamOps Orchestrator
 
+![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![Azure Functions](https://img.shields.io/badge/Azure%20Functions-Serverless-0062AD?style=flat-square&logo=azurefunctions&logoColor=white)
+![Microsoft Teams](https://img.shields.io/badge/Microsoft%20Teams-Bot-6264A7?style=flat-square&logo=microsoftteams&logoColor=white)
+![Azure AI Search](https://img.shields.io/badge/Azure%20AI%20Search-Vector%20RAG-0089D6?style=flat-square&logo=microsoftazure&logoColor=white)
+![Azure OpenAI](https://img.shields.io/badge/Azure%20OpenAI-GPT--4o--mini-00A3FF?style=flat-square&logo=openai&logoColor=white)
+![Azure Storage](https://img.shields.io/badge/Azure%20Storage-Blob%20%2B%20Table-0078D4?style=flat-square&logo=microsoftazure&logoColor=white)
+![CI](https://img.shields.io/github/actions/workflow/status/lerlerchan/ExamOps-Orchestrator/ci.yml?branch=main&label=CI&style=flat-square&logo=githubactions&logoColor=white)
+![Coverage](https://img.shields.io/codecov/c/github/lerlerchan/ExamOps-Orchestrator?branch=main&label=Coverage&style=flat-square&logo=codecov&logoColor=white)
+![Deploy](https://img.shields.io/github/actions/workflow/status/lerlerchan/ExamOps-Orchestrator/deploy.yml?branch=main&label=Deploy&style=flat-square&logo=githubactions&logoColor=white)
+
 AI-powered exam paper formatter for Southern University College. Accepts a `.docx` exam paper, applies deterministic rule-based fixes (numbering, spacing, margins, marks notation, headers), runs an LLM compliance pass, and returns a formatted document with a color-coded diff report — all via Microsoft Teams or an HTTP API.
 
 ---
